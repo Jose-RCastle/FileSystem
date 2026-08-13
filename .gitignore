@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# .NET
+bin/
+obj/
+.vs/
+*.user
+disco-virtual.json
