@@ -36,6 +36,33 @@ public sealed class DiscoVirtual
         return nuevo;
     }
 
+    public void RenombrarArchivo(DirectorioVirtual padre, ArchivoVirtual archivo, string nuevoNombre)
+    {
+        if (!padre.Archivos.Contains(archivo)) throw new InvalidOperationException("El archivo no pertenece al directorio indicado.");
+        nuevoNombre = ValidarNombre(nuevoNombre, true);
+        VerificarDuplicado(padre, nuevoNombre, archivo);
+        archivo.Nombre = nuevoNombre;
+        archivo.Modificado = DateTime.Now;
+    }
+
+    public void RenombrarDirectorio(DirectorioVirtual padre, DirectorioVirtual directorio, string nuevoNombre)
+    {
+        if (ReferenceEquals(directorio, Raiz)) throw new InvalidOperationException("No se puede renombrar el directorio raíz C:\\.");
+        if (!padre.Directorios.Contains(directorio)) throw new InvalidOperationException("La carpeta no pertenece al directorio indicado.");
+        nuevoNombre = ValidarNombre(nuevoNombre, false);
+        VerificarDuplicado(padre, nuevoNombre, directorio);
+        directorio.Nombre = nuevoNombre;
+    }
+
+    public void EditarArchivo(DirectorioVirtual padre, ArchivoVirtual archivo, string nuevoNombre, string contenido)
+    {
+        // Validar el nombre antes de tocar la FAT evita cambios parciales si cambian nombre y contenido.
+        nuevoNombre = ValidarNombre(nuevoNombre, true);
+        VerificarDuplicado(padre, nuevoNombre, archivo);
+        ReemplazarContenido(archivo, contenido);
+        archivo.Nombre = nuevoNombre;
+    }
+
     public ArchivoVirtual CrearArchivo(DirectorioVirtual padre, string nombre, string contenido)
     {
         nombre = ValidarNombre(nombre, true);
@@ -85,7 +112,8 @@ public sealed class DiscoVirtual
 
     public void EliminarDirectorio(DirectorioVirtual padre, DirectorioVirtual directorio)
     {
-        if (directorio.Archivos.Count > 0 || directorio.Directorios.Count > 0) throw new InvalidOperationException("Solo se pueden eliminar carpetas vacías.");
+        if (directorio.Archivos.Count > 0 || directorio.Directorios.Count > 0)
+            throw new InvalidOperationException($"No se puede eliminar \"{directorio.Nombre}\".\n\nLa carpeta contiene archivos o subcarpetas. Vacíela antes de eliminarla.");
         padre.Directorios.Remove(directorio);
     }
 
@@ -97,20 +125,37 @@ public sealed class DiscoVirtual
 
     public IEnumerable<ArchivoVirtual> TodosLosArchivos() => TodosLosDirectorios().SelectMany(d => d.Archivos);
 
-    public string Cadena(ArchivoVirtual archivo) => archivo.PrimerCluster is null ? "(vacío)" : string.Join(" -> ", Fat.Recorrer(archivo.PrimerCluster)) + " -> EOF";
+    public string Cadena(ArchivoVirtual archivo) => archivo.PrimerCluster is null ? "(vacío)" : string.Join(" -> ", Fat.Recorrer(archivo.PrimerCluster)) + " -> EOC";
+
+    public int ClustersUtilizados(ArchivoVirtual archivo) => Fat.Recorrer(archivo.PrimerCluster).Count;
+    public long EspacioFisico(ArchivoVirtual archivo) => ClustersUtilizados(archivo) * (long)Configuracion.TamanoClusterBytes;
+    public long DesperdicioInterno(ArchivoVirtual archivo) => EspacioFisico(archivo) - archivo.TamanoBytes;
 
     public void ValidarIntegridad()
     {
-        if (Fat.Entradas.Count != Configuracion.CantidadClusters || Clusters.Count != Configuracion.CantidadClusters) throw new InvalidDataException("La geometría guardada no coincide.");
+        if (Configuracion.ClustersReservados < 2 || Fat.Entradas.Count != Configuracion.CantidadClusters || Clusters.Count != Configuracion.CantidadClusters) throw new InvalidDataException("La geometría guardada no coincide con FAT32 simulado.");
         var usados = new HashSet<int>();
-        foreach (var archivo in TodosLosArchivos()) foreach (int n in Fat.Recorrer(archivo.PrimerCluster))
-            if (!usados.Add(n) || Clusters[n].ArchivoId != archivo.Id) throw new InvalidDataException("Asignación FAT inconsistente.");
+        for (int i = 0; i < Clusters.Count; i++)
+        {
+            if (i < Configuracion.ClustersReservados && (Fat.Entradas[i] != TablaFat.Reservado || Clusters[i].Estado != EstadoCluster.Reservado || Clusters[i].ArchivoId is not null)) throw new InvalidDataException("Los clusters reservados no son coherentes.");
+            if (Fat.Entradas[i] == TablaFat.Libre && (Clusters[i].Estado != EstadoCluster.Libre || Clusters[i].ArchivoId is not null)) throw new InvalidDataException("Un cluster libre conserva estado o propietario.");
+        }
+        foreach (var archivo in TodosLosArchivos())
+        {
+            var cadena = Fat.Recorrer(archivo.PrimerCluster);
+            int esperados = archivo.TamanoBytes == 0 ? 0 : checked((int)Math.Ceiling(archivo.TamanoBytes / (double)Configuracion.TamanoClusterBytes));
+            if (cadena.Count != esperados || (cadena.Count == 0) != (archivo.PrimerCluster is null)) throw new InvalidDataException("El tamaño lógico no coincide con la cadena FAT.");
+            foreach (int n in cadena)
+                if (n < Configuracion.ClustersReservados || !usados.Add(n) || Clusters[n].Estado != EstadoCluster.Ocupado || Clusters[n].ArchivoId != archivo.Id) throw new InvalidDataException("Asignación FAT inconsistente.");
+        }
+        for (int i = Configuracion.ClustersReservados; i < Clusters.Count; i++)
+            if (Clusters[i].Estado == EstadoCluster.Ocupado && !usados.Contains(i)) throw new InvalidDataException("Existe un cluster ocupado sin una entrada lógica propietaria.");
     }
 
     private void LiberarCluster(int numero) { Clusters[numero].Estado = EstadoCluster.Libre; Clusters[numero].ArchivoId = null; }
-    private static void VerificarDuplicado(DirectorioVirtual padre, string nombre)
+    private static void VerificarDuplicado(DirectorioVirtual padre, string nombre, object? excluir = null)
     {
-        if (padre.Archivos.Any(a => a.Nombre.Equals(nombre, StringComparison.OrdinalIgnoreCase)) || padre.Directorios.Any(d => d.Nombre.Equals(nombre, StringComparison.OrdinalIgnoreCase)))
+        if (padre.Archivos.Any(a => !ReferenceEquals(a, excluir) && a.Nombre.Equals(nombre, StringComparison.OrdinalIgnoreCase)) || padre.Directorios.Any(d => !ReferenceEquals(d, excluir) && d.Nombre.Equals(nombre, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("Ya existe un elemento con ese nombre.");
     }
     private static string ValidarNombre(string nombre, bool archivo)

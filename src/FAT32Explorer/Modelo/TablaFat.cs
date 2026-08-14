@@ -9,7 +9,7 @@ public sealed class TablaFat
 
     public static TablaFat Crear(int total, int reservados)
     {
-        if (total <= 0 || reservados < 0 || reservados >= total)
+        if (total <= 2 || reservados < 2 || reservados >= total)
             throw new ArgumentOutOfRangeException(nameof(total), "La geometría del disco no es válida.");
         return new TablaFat { Entradas = Enumerable.Range(0, total).Select(i => i < reservados ? Reservado : Libre).ToList() };
     }

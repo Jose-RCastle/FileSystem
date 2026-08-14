@@ -45,15 +45,33 @@ internal sealed class ConfiguracionForm : Form
 
     public ConfiguracionForm(ConfiguracionDisco actual)
     {
-        Text = "Configuración del disco virtual"; Size = new Size(440, 285); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog;
+        Text = "Configuración del disco virtual FAT32"; Size = new Size(500, 355); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog;
         nombre.Text = actual.Nombre; clusters.Value = actual.CantidadClusters; tamano.Value = actual.TamanoClusterBytes; reservados.Value = actual.ClustersReservados;
-        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(15), ColumnCount = 2, RowCount = 6 };
+        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(15), ColumnCount = 2, RowCount = 8 };
         tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
         Agregar("Nombre del disco", nombre); Agregar("Cantidad total de clusters", clusters); Agregar("Tamaño de cluster (bytes)", tamano); Agregar("Clusters reservados", reservados);
+        Agregar("Capacidad total calculada", new Label { Text = $"{(long)actual.CantidadClusters * actual.TamanoClusterBytes:N0} bytes", AutoSize = true });
         Agregar("Algoritmo", new Label { Text = "First Fit", AutoSize = true });
+        var advertencia = new Label { Text = "ADVERTENCIA: Aplicar esta configuración formateará el disco virtual y eliminará su contenido.", ForeColor = Color.DarkRed, AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) }; tabla.Controls.Add(advertencia, 0, 6); tabla.SetColumnSpan(advertencia, 2);
         var panel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill };
-        panel.Controls.Add(new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel }); panel.Controls.Add(new Button { Text = "Crear disco", DialogResult = DialogResult.OK });
-        tabla.Controls.Add(panel, 0, 5); tabla.SetColumnSpan(panel, 2); Controls.Add(tabla);
+        panel.Controls.Add(new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel }); panel.Controls.Add(new Button { Text = "Crear / Formatear disco", DialogResult = DialogResult.OK, AutoSize = true });
+        tabla.Controls.Add(panel, 0, 7); tabla.SetColumnSpan(panel, 2); Controls.Add(tabla);
         void Agregar(string texto, Control control) { int fila = tabla.Controls.Count / 2; tabla.Controls.Add(new Label { Text = texto, AutoSize = true, Anchor = AnchorStyles.Left }, 0, fila); control.Dock = DockStyle.Fill; tabla.Controls.Add(control, 1, fila); }
+    }
+}
+
+internal sealed class ConfiguracionSistemaForm : Form
+{
+    private readonly TextBox nombre = new(); private readonly TextBox usuario = new();
+    public string Nombre => nombre.Text.Trim(); public string Usuario => usuario.Text.Trim();
+    public ConfiguracionSistemaForm(ConfiguracionSistema actual)
+    {
+        Text = "Configuración del sistema operativo virtual"; Size = new Size(470, 330); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog;
+        nombre.Text = actual.Nombre; usuario.Text = actual.Usuario;
+        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), ColumnCount = 2, RowCount = 7 };
+        tabla.Controls.Add(new Label { Text = "Nombre del SO", AutoSize = true }, 0, 0); tabla.Controls.Add(nombre, 1, 0); tabla.Controls.Add(new Label { Text = "Usuario", AutoSize = true }, 0, 1); tabla.Controls.Add(usuario, 1, 1);
+        string[] info = ["Sistema de archivos: FAT32 simulado", "Unidad raíz: C:\\", "Estructura: Directorios jerárquicos", "Archivos soportados: TXT"];
+        for (int i = 0; i < info.Length; i++) { var l = new Label { Text = info[i], AutoSize = true, ForeColor = Color.DimGray }; tabla.Controls.Add(l, 0, i + 2); tabla.SetColumnSpan(l, 2); }
+        var botones = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; botones.Controls.Add(new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel }); botones.Controls.Add(new Button { Text = "Guardar", DialogResult = DialogResult.OK }); tabla.Controls.Add(botones, 0, 6); tabla.SetColumnSpan(botones, 2); Controls.Add(tabla);
     }
 }
