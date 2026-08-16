@@ -11,40 +11,86 @@ public sealed class ExploradorForm : Form
     private readonly TreeView arbol = new() { Dock = DockStyle.Fill, HideSelection = false };
     private readonly ListView contenido = new() { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true };
     private readonly DataGridView fat = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
-    private readonly FlowLayoutPanel mapa = new() { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true };
+    private readonly FlowLayoutPanel mapa = new() { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true, BackColor = Color.White };
     private readonly ToolStripStatusLabel estado = new();
-    private readonly Label ruta = new() { Dock = DockStyle.Fill, BorderStyle = BorderStyle.Fixed3D, Padding = new Padding(5) };
-    private readonly Button atras = new() { Text = "←", Width = 38, Dock = DockStyle.Left };
-    private readonly Button subir = new() { Text = "↑", Width = 38, Dock = DockStyle.Left };
+    private readonly ToolStripLabel ruta = new() { BackColor = Color.White, BorderStyle = Border3DStyle.Flat, Margin = new Padding(12, 4, 6, 4), Padding = new Padding(10, 3, 10, 3), AutoSize = false, Width = 390, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly ToolStripButton atras = new("←") { ToolTipText = "Atrás" };
+    private readonly ToolStripButton subir = new("↑") { ToolTipText = "Directorio superior" };
+    private readonly Label detalles = new() { Dock = DockStyle.Fill, Padding = new Padding(14), ForeColor = Color.FromArgb(45, 50, 58) };
+    private readonly ProgressBar capacidad = new() { Dock = DockStyle.Top, Height = 8, Maximum = 100 };
+    private readonly Label capacidadTexto = new() { Dock = DockStyle.Top, Height = 34, Padding = new Padding(0, 7, 0, 0), ForeColor = Color.DimGray };
+    private readonly Panel panelFat = new() { Dock = DockStyle.Fill };
+    private readonly Button alternarFat = new() { Dock = DockStyle.Top, Height = 36, FlatStyle = FlatStyle.Flat, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(12, 0, 0, 0), Text = "▼  Visualización FAT32" };
+    private SplitContainer principal = null!;
+    private int alturaFat = 310;
+    private bool fatExpandida = true;
     private readonly Stack<DirectorioVirtual> historial = new();
     private bool navegando;
     private readonly ContextMenuStrip contextoVacio = new();
     private readonly ContextMenuStrip contextoArchivo = new();
     private readonly ContextMenuStrip contextoCarpeta = new();
+    private readonly ToolTip ayudas = new();
 
     public ExploradorForm(DiscoVirtual disco, AlmacenamientoJson almacenamiento)
     {
         this.disco = disco; this.almacenamiento = almacenamiento; actual = disco.Raiz;
-        Text = "FAT32Explorer — Sistema de archivos virtual"; WindowState = FormWindowState.Maximized; MinimumSize = new Size(950, 650);
+        Text = "FAT32Explorer — Explorador y simulador FAT32"; WindowState = FormWindowState.Maximized; MinimumSize = new Size(1050, 680); EstiloVisual.Aplicar(this);
         contenido.Columns.Add("Nombre", 260); contenido.Columns.Add("Tipo", 110); contenido.Columns.Add("Tamaño lógico", 110); contenido.Columns.Add("Primer cluster", 110); contenido.Columns.Add("Modificado", 170);
         var iconos = new ImageList { ColorDepth = ColorDepth.Depth32Bit, ImageSize = new Size(16, 16) }; iconos.Images.Add("disco", SystemIcons.WinLogo.ToBitmap()); iconos.Images.Add("carpeta", SystemIcons.Application.ToBitmap()); iconos.Images.Add("txt", SystemIcons.Information.ToBitmap()); arbol.ImageList = iconos; contenido.SmallImageList = iconos;
         fat.Columns.Add("numero", "Cluster / Entrada"); fat.Columns.Add("estado", "Estado"); fat.Columns.Add("siguiente", "Valor FAT / Siguiente"); fat.Columns.Add("propietario", "Propietario"); fat.Columns.Add("tipo", "Tipo");
+        fat.AllowUserToDeleteRows = false; fat.AllowUserToResizeRows = false; fat.SelectionMode = DataGridViewSelectionMode.FullRowSelect; fat.RowTemplate.Height = 28; fat.ColumnHeadersHeight = 34; fat.BackgroundColor = Color.White; fat.BorderStyle = BorderStyle.None;
         var menu = CrearMenu(); MainMenuStrip = menu;
-        var superior = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 230, FixedPanel = FixedPanel.Panel1 };
-        var navegacion = new Panel { Dock = DockStyle.Top, Height = 30 }; navegacion.Controls.Add(ruta); navegacion.Controls.Add(subir); navegacion.Controls.Add(atras);
-        superior.Panel1.Controls.Add(arbol); superior.Panel2.Controls.Add(contenido); superior.Panel2.Controls.Add(navegacion);
-        var inferior = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 215 };
-        inferior.Panel1.Controls.Add(fat); inferior.Panel2.Controls.Add(mapa);
-        var principal = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 360 };
-        principal.Panel1.Controls.Add(superior); principal.Panel2.Controls.Add(inferior);
+        var barra = CrearBarraHerramientas();
+        var superior = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 235, FixedPanel = FixedPanel.Panel1, Panel1MinSize = 210, SplitterWidth = 1, BackColor = EstiloVisual.Borde };
+        var izquierda = new Panel { Dock = DockStyle.Fill, BackColor = EstiloVisual.Superficie, Padding = new Padding(10) };
+        var tituloArbol = new Label { Text = "DIRECTORIOS", Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario, Padding = new Padding(4, 8, 0, 0) };
+        izquierda.Controls.Add(arbol); izquierda.Controls.Add(tituloArbol); superior.Panel1.Controls.Add(izquierda);
+        var derecha = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel2, SplitterDistance = 690, Panel2MinSize = 190, SplitterWidth = 1 };
+        derecha.Panel1.Controls.Add(contenido);
+        var rapidas = new Panel { Dock = DockStyle.Fill, BackColor = EstiloVisual.Superficie, Padding = new Padding(12) };
+        rapidas.Controls.Add(detalles); rapidas.Controls.Add(capacidadTexto); rapidas.Controls.Add(capacidad); rapidas.Controls.Add(new Label { Text = "DISCO FAT32", Dock = DockStyle.Top, Height = 32, Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario });
+        derecha.Panel2.Controls.Add(rapidas); superior.Panel2.Controls.Add(derecha);
+        var vistasFat = new TabControl { Dock = DockStyle.Fill }; var tabTabla = new TabPage("Tabla FAT") { BackColor = Color.White }; var tabMapa = new TabPage("Mapa de clusters") { BackColor = Color.White };
+        tabTabla.Controls.Add(fat); tabMapa.Controls.Add(mapa); tabMapa.Controls.Add(CrearLeyenda()); vistasFat.TabPages.AddRange([tabTabla, tabMapa]);
+        panelFat.Controls.Add(vistasFat); panelFat.Controls.Add(alternarFat);
+        principal = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 410, Panel2MinSize = 36, SplitterWidth = 4 };
+        principal.Panel1.Controls.Add(superior); principal.Panel2.Controls.Add(panelFat);
         var status = new StatusStrip(); status.Items.Add(estado);
-        Controls.Add(principal); Controls.Add(status); Controls.Add(menu);
+        Controls.Add(principal); Controls.Add(status); Controls.Add(barra); Controls.Add(menu);
         contenido.MouseDoubleClick += (_, _) => AbrirSeleccion(); contenido.SelectedIndexChanged += (_, _) => RefrescarFat();
         arbol.AfterSelect += (_, e) => { if (!navegando && e.Node?.Tag is DirectorioVirtual d) NavegarA(d); };
-        atras.Click += (_, _) => IrAtras(); subir.Click += (_, _) => Subir();
+        atras.Click += (_, _) => IrAtras(); subir.Click += (_, _) => Subir(); alternarFat.Click += (_, _) => AlternarFat();
         CrearContextos(); contenido.MouseDown += SeleccionarParaContexto; mapa.Padding = new Padding(4);
         FormClosing += (_, _) => GuardarSilenciosamente();
         RefrescarTodo();
+    }
+
+    private ToolStrip CrearBarraHerramientas()
+    {
+        var barra = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Height = 42, Padding = new Padding(8, 4, 8, 4), BackColor = Color.FromArgb(249, 250, 252) };
+        var actualizar = new ToolStripButton("⟳") { ToolTipText = "Actualizar" }; actualizar.Click += (_, _) => RefrescarTodo();
+        var carpeta = new ToolStripButton("＋ Carpeta") { ToolTipText = "Nueva carpeta" }; carpeta.Click += (_, _) => NuevaCarpeta();
+        var archivo = new ToolStripButton("＋ TXT") { ToolTipText = "Nuevo archivo TXT" }; archivo.Click += (_, _) => NuevoArchivo();
+        var propiedades = new ToolStripButton("ⓘ Propiedades") { ToolTipText = "Propiedades del elemento seleccionado" }; propiedades.Click += (_, _) => PropiedadesSeleccion();
+        barra.Items.AddRange([atras, subir, actualizar, new ToolStripSeparator(), carpeta, archivo, new ToolStripSeparator(), propiedades, ruta]);
+        return barra;
+    }
+
+    private static Control CrearLeyenda()
+    {
+        var leyenda = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 34, Padding = new Padding(8, 5, 0, 0), BackColor = Color.White };
+        foreach (var (texto, color) in new[] { ("Reservado", Color.SlateGray), ("Libre", Color.LightGreen), ("Ocupado", Color.LightSkyBlue), ("Seleccionado", Color.Gold) })
+            leyenda.Controls.Add(new Label { Text = $"■ {texto}", AutoSize = true, ForeColor = color == Color.LightGreen ? Color.SeaGreen : color == Color.LightSkyBlue ? Color.SteelBlue : color == Color.Gold ? Color.DarkGoldenrod : color, Margin = new Padding(8, 2, 8, 2) });
+        return leyenda;
+    }
+
+    private void AlternarFat()
+    {
+        fatExpandida = !fatExpandida;
+        panelFat.Controls[0].Visible = fatExpandida;
+        if (fatExpandida) principal.SplitterDistance = Math.Max(100, principal.Height - alturaFat);
+        else { alturaFat = principal.Panel2.Height; principal.SplitterDistance = Math.Max(100, principal.Height - alternarFat.Height); }
+        alternarFat.Text = fatExpandida ? "▼  Visualización FAT32" : "▶  Visualización FAT32";
     }
 
     private MenuStrip CrearMenu()
@@ -55,15 +101,15 @@ public sealed class ExploradorForm : Form
         var operaciones = new ToolStripMenuItem("Operaciones");
         operaciones.DropDownItems.Add("Nuevo archivo TXT", null, (_, _) => NuevoArchivo()); operaciones.DropDownItems.Add("Nueva carpeta", null, (_, _) => NuevaCarpeta());
         operaciones.DropDownItems.Add("Abrir / Editar", null, (_, _) => AbrirSeleccion()); operaciones.DropDownItems.Add("Renombrar", null, (_, _) => RenombrarSeleccion()); operaciones.DropDownItems.Add("Mover a...", null, (_, _) => MoverSeleccion()); operaciones.DropDownItems.Add("Eliminar", null, (_, _) => EliminarSeleccion()); operaciones.DropDownItems.Add("Propiedades", null, (_, _) => PropiedadesSeleccion());
-        var ver = new ToolStripMenuItem("Ver"); ver.DropDownItems.Add("Actualizar", null, (_, _) => RefrescarTodo()); ver.DropDownItems.Add("Estructura FAT32", null, (_, _) => new EstructuraFat32Form(disco, Seleccionado()?.Tag).ShowDialog(this)); ver.DropDownItems.Add("Información FAT32", null, (_, _) => MessageBox.Show(this, "0 y 1: RESERVED · clusters de datos desde 2\nFREE: disponible · EOC: fin de cadena\nLa FAT es la fuente de verdad y First Fit permite fragmentación.", "Información FAT32"));
-        var ayuda = new ToolStripMenuItem("Ayuda"); ayuda.DropDownItems.Add("Acerca de", null, (_, _) => MessageBox.Show(this, "Simulador didáctico FAT32\n.NET 8 + Windows Forms\nNo modifica archivos ni discos reales.", "FAT32Explorer"));
+        var ver = new ToolStripMenuItem("Ver"); ver.DropDownItems.Add("Actualizar", null, (_, _) => RefrescarTodo()); ver.DropDownItems.Add("Estructura FAT32", null, (_, _) => new EstructuraFat32Form(disco, Seleccionado()?.Tag).ShowDialog(this)); ver.DropDownItems.Add("Mostrar / ocultar visualización FAT32", null, (_, _) => AlternarFat()); ver.DropDownItems.Add("Información FAT32", null, (_, _) => MessageBox.Show(this, "0 y 1: RESERVED · clusters de datos desde 2\nFREE: disponible · EOC: fin de cadena\nLa FAT es la fuente de verdad y First Fit permite fragmentación.", "Información FAT32"));
+        var ayuda = new ToolStripMenuItem("Ayuda"); ayuda.DropDownItems.Add("Acerca de FAT32Explorer", null, (_, _) => MessageBox.Show(this, "FAT32Explorer\nSimulador didáctico de sistema de archivos FAT32\n\nSistemas Operativos I\n\nFAT · clusters · directorios · fragmentación · First Fit", "Acerca de FAT32Explorer"));
         menu.Items.AddRange([archivo, discoMenu, operaciones, ver, ayuda]); return menu;
     }
 
     private void CrearContextos()
     {
         contextoVacio.Items.Add("Nuevo archivo TXT", null, (_, _) => NuevoArchivo()); contextoVacio.Items.Add("Nueva carpeta", null, (_, _) => NuevaCarpeta()); contextoVacio.Items.Add("Actualizar", null, (_, _) => RefrescarTodo());
-        contextoArchivo.Items.Add("Abrir / Editar", null, (_, _) => AbrirSeleccion()); contextoArchivo.Items.Add("Renombrar", null, (_, _) => RenombrarSeleccion()); contextoArchivo.Items.Add("Mover a...", null, (_, _) => MoverSeleccion()); contextoArchivo.Items.Add("Eliminar", null, (_, _) => EliminarSeleccion()); contextoArchivo.Items.Add("Propiedades", null, (_, _) => PropiedadesSeleccion()); contextoArchivo.Items.Add("Ver clusters", null, (_, _) => PropiedadesSeleccion());
+        contextoArchivo.Items.Add("Abrir / Editar", null, (_, _) => AbrirSeleccion()); contextoArchivo.Items.Add(new ToolStripSeparator()); contextoArchivo.Items.Add("Renombrar", null, (_, _) => RenombrarSeleccion()); contextoArchivo.Items.Add("Mover a...", null, (_, _) => MoverSeleccion()); contextoArchivo.Items.Add("Eliminar", null, (_, _) => EliminarSeleccion()); contextoArchivo.Items.Add(new ToolStripSeparator()); contextoArchivo.Items.Add("Propiedades", null, (_, _) => PropiedadesSeleccion());
         contextoCarpeta.Items.Add("Abrir", null, (_, _) => AbrirSeleccion()); contextoCarpeta.Items.Add(new ToolStripSeparator()); contextoCarpeta.Items.Add("Nuevo archivo TXT aquí", null, (_, _) => CrearDentro(true)); contextoCarpeta.Items.Add("Nueva carpeta aquí", null, (_, _) => CrearDentro(false)); contextoCarpeta.Items.Add(new ToolStripSeparator()); contextoCarpeta.Items.Add("Renombrar", null, (_, _) => RenombrarSeleccion()); contextoCarpeta.Items.Add("Mover a...", null, (_, _) => MoverSeleccion()); contextoCarpeta.Items.Add("Eliminar", null, (_, _) => EliminarSeleccion()); contextoCarpeta.Items.Add(new ToolStripSeparator()); contextoCarpeta.Items.Add("Propiedades FAT32", null, (_, _) => PropiedadesSeleccion());
     }
 
@@ -79,7 +125,7 @@ public sealed class ExploradorForm : Form
 
     private void NuevoArchivo()
     {
-        using var editor = new EditorTextoForm(null);
+        using var editor = new EditorTextoForm(null, disco.Configuracion.TamanoClusterBytes);
         if (editor.ShowDialog(this) != DialogResult.OK) return;
         Ejecutar(() => disco.CrearArchivo(actual, editor.Nombre, editor.Contenido));
     }
@@ -95,7 +141,7 @@ public sealed class ExploradorForm : Form
         if (Seleccionado() is not { Tag: object elemento }) return;
         if (elemento is DirectorioVirtual d) { NavegarA(d); return; }
         var archivo = (ArchivoVirtual)elemento;
-        using var editor = new EditorTextoForm(archivo);
+        using var editor = new EditorTextoForm(archivo, disco.Configuracion.TamanoClusterBytes);
         if (editor.ShowDialog(this) == DialogResult.OK)
         {
             Ejecutar(() => disco.EditarArchivo(actual, archivo, editor.Nombre, editor.Contenido));
@@ -175,7 +221,8 @@ public sealed class ExploradorForm : Form
         contenido.BeginUpdate(); contenido.Items.Clear();
         foreach (var d in actual.Directorios.OrderBy(x => x.Nombre)) contenido.Items.Add(new ListViewItem([d.Nombre, "Directorio FAT32", $"{disco.TamanoLogicoDirectorio(d):N0} bytes", d.PrimerCluster?.ToString() ?? "—", d.Creado.ToString("g")], "carpeta") { Tag = d });
         foreach (var a in actual.Archivos.OrderBy(x => x.Nombre)) contenido.Items.Add(new ListViewItem([a.Nombre, "Archivo TXT", $"{a.TamanoBytes:N0} bytes", a.PrimerCluster?.ToString() ?? "—", a.Modificado.ToString("g")], "txt") { Tag = a });
-        contenido.EndUpdate(); ruta.Text = RutaDe(actual); atras.Enabled = historial.Count > 0; subir.Enabled = !ReferenceEquals(actual, disco.Raiz);
+        contenido.EndUpdate(); ruta.Text = RutaDe(actual).Replace("\\", "  ›  ").Replace("C:  ›  ", "C:\\  ›  ").TrimEnd('›', ' '); atras.Enabled = historial.Count > 0; subir.Enabled = !ReferenceEquals(actual, disco.Raiz);
+        int porcentaje = disco.Configuracion.CapacidadBytes == 0 ? 0 : (int)Math.Round(disco.EspacioUsado * 100d / disco.Configuracion.CapacidadBytes); capacidad.Value = Math.Clamp(porcentaje, 0, 100); capacidadTexto.Text = $"{porcentaje}% usado\n{Formato(disco.EspacioUsado)} de {Formato(disco.Configuracion.CapacidadBytes)}";
         estado.Text = $"{disco.SistemaOperativo.Nombre} · {disco.SistemaOperativo.Usuario} | {disco.Configuracion.Nombre} | Sector: {Formato(disco.Configuracion.BytesPorSector)} | Cluster: {Formato(disco.Configuracion.TamanoClusterBytes)} | Datos: {Formato(disco.Configuracion.CapacidadBytes)} | Usado: {Formato(disco.EspacioUsado)} | Libre: {Formato(disco.EspacioLibre)}";
     }
     private string RutaDe(DirectorioVirtual objetivo) { if (ReferenceEquals(objetivo, disco.Raiz)) return "C:\\"; var partes = new List<string>(); Buscar(disco.Raiz); return "C:\\" + string.Join("\\", partes.AsEnumerable().Reverse().Where(p => p != "C:")); bool Buscar(DirectorioVirtual d) { if (ReferenceEquals(d, objetivo)) { partes.Add(d.Nombre.TrimEnd('\\')); return true; } foreach (var h in d.Directorios) if (Buscar(h)) { partes.Add(d.Nombre.TrimEnd('\\')); return true; } return false; } }
@@ -188,7 +235,7 @@ public sealed class ExploradorForm : Form
         object? elementoSeleccionado = Seleccionado()?.Tag ?? arbol.SelectedNode?.Tag;
         string? resaltado = elementoSeleccionado switch { ArchivoVirtual a => a.Id, DirectorioVirtual d => d.Id, _ => null };
         var propietarios = disco.TodosLosArchivos().Select(a => new { a.Id, a.Nombre, Tipo = "Archivo" }).Concat(disco.TodosLosDirectorios().Select(d => new { d.Id, d.Nombre, Tipo = "Directorio" })).ToDictionary(x => x.Id);
-        fat.Rows.Clear(); mapa.Controls.Clear();
+        fat.Rows.Clear(); mapa.Controls.Clear(); ActualizarDetalles(elementoSeleccionado);
         foreach (var c in disco.Clusters)
         {
             int entrada = disco.Fat.Entradas[c.Numero]; string siguiente = entrada switch { TablaFat.Eof => "EOC", TablaFat.Libre => "FREE", TablaFat.Reservado => "RESERVED", _ => entrada.ToString() };
@@ -198,9 +245,19 @@ public sealed class ExploradorForm : Form
             Color colorEstado = c.Estado switch { EstadoCluster.Reservado => Color.SlateGray, EstadoCluster.Libre => Color.LightGreen, _ => Color.LightSkyBlue };
             int fila = fat.Rows.Add(c.Numero, c.Estado, siguiente, nombrePropietario, tipo);
             fat.Rows[fila].DefaultCellStyle.BackColor = seleccionado ? Color.Gold : colorEstado;
-            var etiqueta = new Label { Text = c.Estado == EstadoCluster.Reservado ? $"FAT[{c.Numero}]\nRESERVED" : c.Estado == EstadoCluster.Libre ? $"{c.Numero}\nFREE" : $"{c.Numero}\n{nombrePropietario}", Size = new Size(92, 50), TextAlign = ContentAlignment.MiddleCenter, BorderStyle = BorderStyle.FixedSingle, BackColor = seleccionado ? Color.Gold : colorEstado };
+            var etiqueta = new Label { Text = c.Estado == EstadoCluster.Reservado ? $"FAT[{c.Numero}]\nRESERVED" : c.Estado == EstadoCluster.Libre ? $"{c.Numero}\nFREE" : $"{c.Numero}\n{nombrePropietario}", Size = new Size(98, 54), Margin = new Padding(4), TextAlign = ContentAlignment.MiddleCenter, BorderStyle = BorderStyle.FixedSingle, BackColor = seleccionado ? Color.Gold : colorEstado };
+            ayudas.SetToolTip(etiqueta, $"Cluster: {c.Numero}\nEstado: {c.Estado}\nPropietario: {nombrePropietario}\nTipo: {tipo}\nFAT: {siguiente}");
             mapa.Controls.Add(etiqueta);
         }
+    }
+    private void ActualizarDetalles(object? elemento)
+    {
+        detalles.Text = elemento switch
+        {
+            ArchivoVirtual a => $"{a.Nombre}\nArchivo TXT\n\nTamaño:  {Formato(a.TamanoBytes)}\nPrimer cluster:  {a.PrimerCluster?.ToString() ?? "—"}\nClusters:  {disco.ClustersUtilizados(a)}\nFragmentación:  {(disco.EstaFragmentado(a) ? "Fragmentado" : "Contiguo")}",
+            DirectorioVirtual d => $"{d.Nombre}\nDirectorio FAT32\n\nPrimer cluster:  {d.PrimerCluster}\nElementos:  {d.Archivos.Count + d.Directorios.Count}\nEspacio propio:  {Formato(disco.EspacioFisicoDirectorio(d))}",
+            _ => "Seleccione un elemento para ver sus propiedades rápidas."
+        };
     }
     private static string Formato(long bytes) => bytes < 1024 ? $"{bytes} B" : bytes < 1048576 ? $"{bytes / 1024d:0.##} KiB" : $"{bytes / 1048576d:0.##} MiB";
 }

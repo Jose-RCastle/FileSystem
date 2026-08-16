@@ -53,6 +53,12 @@ FAT[19] = EOC
 
 La entrada de directorio conserva `PrimerCluster`; la FAT es la fuente de verdad que permite recorrer `8 → 15 → 19 → EOC`. La tabla y el mapa resaltan simultáneamente esa cadena. Una cadena cuyos clusters no son consecutivos se identifica como **fragmentada**; no se implementa desfragmentación.
 
+## Interfaz y modo de demostración
+
+La ventana principal organiza la demostración en tres niveles: la barra superior reúne navegación y operaciones, el centro funciona como **Explorador** de directorios y archivos, y la sección inferior colapsable explica su almacenamiento físico. La ruta de solo lectura, **Atrás** y **Subir** permiten navegar sin introducir ubicaciones inexistentes.
+
+Al seleccionar un elemento se muestran propiedades rápidas, su capacidad asociada y, simultáneamente, el resaltado de su cadena en la **Tabla FAT** y el **Mapa de clusters**. La leyenda conserva texto además del color para distinguir reservado, libre, ocupado y seleccionado. **Ver → Estructura FAT32** abre una vista para exposición con tarjetas de Boot/BPB, FAT, área de datos, FSInfo conceptual y el flujo `Entrada → PrimerCluster → FAT → cadena → datos`; el diálogo **Propiedades** ofrece el detalle completo.
+
 ## Modelo FAT32 simulado
 
 - **Geometría:** `TamañoClusterBytes = BytesPorSector × SectoresPorCluster`. `FAT[0]` y `FAT[1]` son entradas especiales `RESERVED`, no clusters físicos ni sectores reservados. La capacidad es `clusters de datos × tamaño de cluster`; los datos comienzan en el cluster 2.
