@@ -26,7 +26,7 @@ public sealed class ExploradorForm : Form
         var iconos = new ImageList { ColorDepth = ColorDepth.Depth32Bit, ImageSize = new Size(16, 16) }; iconos.Images.Add("disco", SystemIcons.WinLogo.ToBitmap()); iconos.Images.Add("carpeta", SystemIcons.Application.ToBitmap()); iconos.Images.Add("txt", SystemIcons.Information.ToBitmap()); arbol.ImageList = iconos; contenido.SmallImageList = iconos;
         fat.Columns.Add("numero", "Cluster"); fat.Columns.Add("estado", "Estado"); fat.Columns.Add("siguiente", "Valor FAT / Siguiente"); fat.Columns.Add("archivo", "Archivo");
         var menu = CrearMenu(); MainMenuStrip = menu;
-        var superior = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 190, FixedPanel = FixedPanel.Panel1 };
+        var superior = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 230, FixedPanel = FixedPanel.Panel1 };
         superior.Panel1.Controls.Add(arbol); superior.Panel2.Controls.Add(contenido); superior.Panel2.Controls.Add(ruta);
         var inferior = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 215 };
         inferior.Panel1.Controls.Add(fat); inferior.Panel2.Controls.Add(mapa);
@@ -35,7 +35,7 @@ public sealed class ExploradorForm : Form
         var status = new StatusStrip(); status.Items.Add(estado);
         Controls.Add(principal); Controls.Add(status); Controls.Add(menu);
         contenido.MouseDoubleClick += (_, _) => AbrirSeleccion(); contenido.SelectedIndexChanged += (_, _) => RefrescarFat();
-        arbol.AfterSelect += (_, e) => { if (e.Node.Tag is DirectorioVirtual d) { actual = d; RefrescarContenido(); } };
+        arbol.AfterSelect += (_, e) => { if (e.Node?.Tag is DirectorioVirtual d) { actual = d; RefrescarContenido(); } };
         CrearContextos(); contenido.MouseDown += SeleccionarParaContexto; mapa.Padding = new Padding(4);
         FormClosing += (_, _) => GuardarSilenciosamente();
         RefrescarTodo();
@@ -176,9 +176,11 @@ public sealed class ExploradorForm : Form
         {
             int entrada = disco.Fat.Entradas[c.Numero]; string siguiente = entrada switch { TablaFat.Eof => "EOC", TablaFat.Libre => "FREE", TablaFat.Reservado => "RESERVED", _ => entrada.ToString() };
             string archivo = c.ArchivoId is not null && nombres.TryGetValue(c.ArchivoId, out var n) ? n : "—";
+            bool seleccionado = resaltado is not null && c.ArchivoId == resaltado;
+            Color colorEstado = c.Estado switch { EstadoCluster.Reservado => Color.SlateGray, EstadoCluster.Libre => Color.LightGreen, _ => Color.LightSkyBlue };
             int fila = fat.Rows.Add(c.Numero, c.Estado, siguiente, archivo);
-            if (c.ArchivoId == resaltado) fat.Rows[fila].DefaultCellStyle.BackColor = Color.Gold;
-            var etiqueta = new Label { Text = c.Estado == EstadoCluster.Reservado ? $"{c.Numero}\nR" : c.Estado == EstadoCluster.Libre ? $"{c.Numero}\nLIBRE" : $"{c.Numero}\n{archivo}", Size = new Size(82, 48), TextAlign = ContentAlignment.MiddleCenter, BorderStyle = BorderStyle.FixedSingle, BackColor = c.ArchivoId == resaltado ? Color.Gold : c.Estado switch { EstadoCluster.Reservado => Color.SlateGray, EstadoCluster.Libre => Color.LightGreen, _ => Color.LightSkyBlue } };
+            fat.Rows[fila].DefaultCellStyle.BackColor = seleccionado ? Color.Gold : colorEstado;
+            var etiqueta = new Label { Text = c.Estado == EstadoCluster.Reservado ? $"{c.Numero}\nR" : c.Estado == EstadoCluster.Libre ? $"{c.Numero}\nLIBRE" : $"{c.Numero}\n{archivo}", Size = new Size(82, 48), TextAlign = ContentAlignment.MiddleCenter, BorderStyle = BorderStyle.FixedSingle, BackColor = seleccionado ? Color.Gold : colorEstado };
             mapa.Controls.Add(etiqueta);
         }
     }
