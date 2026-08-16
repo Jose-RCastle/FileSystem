@@ -25,22 +25,29 @@ dotnet run --project tests/FAT32Explorer.Pruebas
 - `ExploradorForm` muestra árbol, contenido, tabla FAT, mapa de clusters y capacidad; `EditorTextoForm` funciona como un bloc de notas básico. El menú Configuración permite definir tanto el disco como el nombre y usuario del sistema operativo virtual.
 - El estado se guarda atómicamente como JSON en `Application.UserAppDataPath` y se valida al cargar.
 
-Los clusters reservados se contabilizan como espacio usado, pues no están disponibles para archivos. Un archivo vacío no necesita cluster y muestra `(vacío)` como cadena.
+`CantidadClusters` representa exclusivamente los clusters del área de datos. Las entradas FAT 0 y 1 son especiales, aparecen en la tabla pero no consumen capacidad. Un archivo vacío no necesita cluster; un directorio vacío sí conserva almacenamiento para su entrada propia.
 
-## Qué elementos de FAT32 se simulan
+## Modelo FAT32 simulado
 
-- **Clusters y área de datos:** las entradas 0 y 1 están reservadas y los archivos solo pueden usar clusters desde el 2. El mapa distingue `RESERVED`, `FREE`, ocupado y seleccionado.
+- **Geometría:** `FAT[0]` y `FAT[1]` son entradas especiales `RESERVED`, no clusters físicos ni sectores reservados. La capacidad es `clusters de datos × tamaño de cluster`; los datos comienzan en el cluster 2.
+- **Directorio raíz:** al formatear, `C:\` recibe mediante First Fit su propia cadena FAT (normalmente `2 -> EOC`).
+- **Directorios físicos:** cada directorio guarda solo `PrimerCluster` y reconstruye su cadena desde la FAT, igual que un archivo. Una carpeta vacía ocupa como mínimo un cluster.
+- **Entradas simplificadas:** se modelan 32 bytes por la entrada propia del directorio y por cada elemento directo. Al crecer o reducirse el número de elementos, la cadena del directorio crece o se contrae transaccionalmente.
 - **FAT como fuente de verdad:** la entrada lógica del archivo conserva nombre, tamaño, fechas y `PrimerCluster`; desde este se siguen los enlaces hasta `EOC` (End Of Chain). No se guarda una segunda lista de clusters.
 - **First Fit y fragmentación:** se toman los primeros clusters libres, aunque no sean contiguos. Eliminar libera la cadena y permite reutilizar sus huecos, por lo que cadenas como `2 -> 3 -> 6 -> 7 -> EOC` son visibles y esperables.
 - **Espacio:** el tamaño lógico son los bytes UTF-8 reales. El espacio físico es la cantidad de clusters por el tamaño de cluster; su diferencia es el desperdicio interno. La barra inferior separa capacidad, usado y libre.
-- **Operaciones lógicas:** crear, editar, renombrar o mover conserva la separación entre la entrada del directorio y los datos físicos. Un cambio sin espacio o con nombre duplicado no modifica el archivo anterior.
+- **Operaciones lógicas:** renombrar y mover archivos o árboles de carpetas cambia relaciones lógicas, no sus cadenas. Se impiden ciclos y duplicados. El borrado recursivo explícito libera archivos, subdirectorios y el directorio seleccionado.
 - **Persistencia:** la geometría, FAT, clusters, jerarquía, contenidos y metadatos se guardan en JSON. Cadenas y métricas derivadas se reconstruyen al cargar y se valida su integridad.
 
-## Simplificaciones respecto a FAT32 real
+## Diferencias respecto a FAT32 real
 
 > No estamos implementando un volumen FAT32 binario compatible con Windows; estamos emulando didácticamente sus mecanismos esenciales de administración de archivos.
 
-- Los directorios son colecciones lógicas jerárquicas y **no consumen clusters**. En FAT32 real, incluido el raíz, son archivos especiales almacenados en el área de datos. Mantenerlos lógicos evita una migración riesgosa del formato JSON y conserva un motor pequeño para exposición.
-- No se implementan entradas binarias de 32 bytes, nombres 8.3/LFN, sectores, MBR, BPB, FSInfo, dos copias físicas de FAT ni acceso a discos reales.
+- Los directorios sí consumen clusters, pero sus entradas de 32 bytes son una medida académica: no se codifican campos binarios, `.`/`..`, nombres 8.3 ni entradas LFN adicionales.
+- No se implementan sectores, MBR/GPT, BPB, FSInfo, dos copias físicas de FAT ni acceso a discos reales.
 - El contenido completo se conserva como texto JSON; los clusters representan su asignación y capacidad, no contienen bloques binarios separados.
-- Solo se admiten archivos TXT, no hay permisos, journaling ni eliminación recursiva, y mover carpetas queda fuera de esta fase.
+- Solo se admiten archivos TXT y no hay permisos ni journaling.
+
+## Compatibilidad del estado guardado
+
+El formato actual usa `VersionModelo = 3`. Como esta versión asigna clusters físicos a directorios y cambia la geometría, un JSON de fases anteriores se rechaza con un mensaje explícito y debe recrearse; no se intenta una migración silenciosa que pudiera superponer cadenas FAT.

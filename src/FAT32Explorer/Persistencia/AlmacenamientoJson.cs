@@ -23,7 +23,11 @@ public sealed class AlmacenamientoJson(string ruta)
     public DiscoVirtual? Cargar()
     {
         if (!File.Exists(ruta)) return null;
-        var disco = JsonSerializer.Deserialize<DiscoVirtual>(File.ReadAllText(ruta), Opciones);
+        string json = File.ReadAllText(ruta);
+        using var documento = JsonDocument.Parse(json);
+        if (!documento.RootElement.TryGetProperty(nameof(DiscoVirtual.VersionModelo), out var version) || version.GetInt32() != DiscoVirtual.VersionActual)
+            throw new InvalidDataException("El disco guardado pertenece a una versión anterior del simulador y debe recrearse.");
+        var disco = JsonSerializer.Deserialize<DiscoVirtual>(json, Opciones);
         disco?.ValidarIntegridad();
         return disco;
     }

@@ -40,16 +40,15 @@ internal sealed class ConfiguracionForm : Form
     private readonly TextBox nombre = new();
     private readonly NumericUpDown clusters = new() { Minimum = 8, Maximum = 4096 };
     private readonly NumericUpDown tamano = new() { Minimum = 64, Maximum = 1048576, Increment = 64 };
-    private readonly NumericUpDown reservados = new() { Minimum = 1, Maximum = 32 };
-    public ConfiguracionDisco Configuracion => new() { Nombre = nombre.Text.Trim(), CantidadClusters = (int)clusters.Value, TamanoClusterBytes = (int)tamano.Value, ClustersReservados = (int)reservados.Value };
+    public ConfiguracionDisco Configuracion => new() { Nombre = nombre.Text.Trim(), CantidadClusters = (int)clusters.Value, TamanoClusterBytes = (int)tamano.Value };
 
     public ConfiguracionForm(ConfiguracionDisco actual)
     {
         Text = "Configuración del disco virtual FAT32"; Size = new Size(500, 355); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog;
-        nombre.Text = actual.Nombre; clusters.Value = actual.CantidadClusters; tamano.Value = actual.TamanoClusterBytes; reservados.Value = actual.ClustersReservados;
+        nombre.Text = actual.Nombre; clusters.Value = actual.CantidadClusters; tamano.Value = actual.TamanoClusterBytes;
         var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(15), ColumnCount = 2, RowCount = 8 };
         tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-        Agregar("Nombre del disco", nombre); Agregar("Cantidad total de clusters", clusters); Agregar("Tamaño de cluster (bytes)", tamano); Agregar("Clusters reservados", reservados);
+        Agregar("Nombre del disco", nombre); Agregar("Clusters de datos", clusters); Agregar("Tamaño de cluster (bytes)", tamano); Agregar("Entradas FAT especiales", new Label { Text = "0 y 1 (no consumen capacidad)", AutoSize = true });
         Agregar("Capacidad total calculada", new Label { Text = $"{(long)actual.CantidadClusters * actual.TamanoClusterBytes:N0} bytes", AutoSize = true });
         Agregar("Algoritmo", new Label { Text = "First Fit", AutoSize = true });
         var advertencia = new Label { Text = "ADVERTENCIA: Aplicar esta configuración formateará el disco virtual y eliminará su contenido.", ForeColor = Color.DarkRed, AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) }; tabla.Controls.Add(advertencia, 0, 6); tabla.SetColumnSpan(advertencia, 2);

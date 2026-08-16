@@ -1,62 +1,69 @@
 using FAT32Explorer.Modelo;
 using FAT32Explorer.Persistencia;
 
-var disco = DiscoVirtual.Crear(new ConfiguracionDisco { CantidadClusters = 8, ClustersReservados = 2, TamanoClusterBytes = 4 });
-var documentos = disco.CrearDirectorio(disco.Raiz, "Documentos");
-var archivo = disco.CrearArchivo(disco.Raiz, "tarea", "12345");
-Igual(2, disco.Fat.Recorrer(archivo.PrimerCluster).Count, "archivo multicluster");
-Igual(2, archivo.PrimerCluster, "First Fit comienza en el primer cluster de datos");
-Verdadero(archivo.PrimerCluster is >= 2, "0 y 1 nunca se asignan");
-Igual("12345", archivo.Contenido, "lectura de contenido");
-Igual(5L, archivo.TamanoBytes, "tamaño lógico UTF-8"); Igual(8L, disco.EspacioFisico(archivo), "espacio físico"); Igual(3L, disco.DesperdicioInterno(archivo), "desperdicio interno");
-
-disco.ReemplazarContenido(archivo, "123456789");
-Igual(3, disco.Fat.Recorrer(archivo.PrimerCluster).Count, "crecimiento");
-disco.ReemplazarContenido(archivo, "1");
-Igual(1, disco.Fat.Recorrer(archivo.PrimerCluster).Count, "reducción");
-
-var cadenaAntes = disco.Cadena(archivo);
-disco.MoverArchivo(disco.Raiz, documentos, archivo);
-Igual(cadenaAntes, disco.Cadena(archivo), "mover conserva FAT");
-Falla(() => disco.CrearArchivo(documentos, "tarea.txt", "x"), "duplicados");
-int primeroAntes = archivo.PrimerCluster!.Value; cadenaAntes = disco.Cadena(archivo);
-disco.RenombrarArchivo(documentos, archivo, "tarea-final");
-Igual(primeroAntes, archivo.PrimerCluster, "renombrar conserva PrimerCluster"); Igual(cadenaAntes, disco.Cadena(archivo), "renombrar conserva cadena FAT");
-var conflicto = disco.CrearArchivo(documentos, "conflicto.txt", ""); Falla(() => disco.RenombrarArchivo(documentos, archivo, conflicto.Nombre), "duplicado al renombrar");
-
-int liberado = archivo.PrimerCluster!.Value;
-disco.EliminarArchivo(documentos, archivo);
-var reutilizado = disco.CrearArchivo(documentos, "otro.txt", "xx");
-Igual(liberado, reutilizado.PrimerCluster, "First Fit reutiliza clusters");
-
-var carpetaA = disco.CrearDirectorio(disco.Raiz, "A"); var carpetaB = disco.CrearDirectorio(disco.Raiz, "B");
-disco.RenombrarDirectorio(disco.Raiz, carpetaA, "Renombrada"); Igual("Renombrada", carpetaA.Nombre, "renombrar carpeta");
-Falla(() => disco.RenombrarDirectorio(disco.Raiz, carpetaA, carpetaB.Nombre), "duplicado de carpeta");
-disco.CrearArchivo(carpetaA, "contenido.txt", ""); Falla(() => disco.EliminarDirectorio(disco.Raiz, carpetaA), "no eliminar carpeta no vacía");
-
-var lleno = disco.CrearArchivo(disco.Raiz, "grande.txt", new string('x', 20));
-var cadenaOriginal = disco.Cadena(lleno); var contenidoOriginal = lleno.Contenido;
-Falla(() => disco.ReemplazarContenido(lleno, new string('x', 40)), "sin espacio");
-Igual(cadenaOriginal, disco.Cadena(lleno), "fallo no corrompe FAT");
-Igual(contenidoOriginal, lleno.Contenido, "fallo conserva contenido");
-Igual(disco.Configuracion.CapacidadBytes, disco.EspacioUsado + disco.EspacioLibre, "cálculo de espacio");
-disco.ValidarIntegridad();
-
-var fragmentado = DiscoVirtual.Crear(new ConfiguracionDisco { CantidadClusters = 10, ClustersReservados = 2, TamanoClusterBytes = 1 });
-var a = fragmentado.CrearArchivo(fragmentado.Raiz, "a.txt", "aa"); fragmentado.CrearArchivo(fragmentado.Raiz, "b.txt", "bb"); fragmentado.EliminarArchivo(fragmentado.Raiz, a);
-var c = fragmentado.CrearArchivo(fragmentado.Raiz, "c.txt", "cccc"); Igual("2 -> 3 -> 6 -> 7 -> EOC", fragmentado.Cadena(c), "fragmentación First Fit no contigua");
-
-string ruta = Path.Combine(Path.GetTempPath(), $"fat32-{Guid.NewGuid():N}.json");
-try { var json = new AlmacenamientoJson(ruta); json.Guardar(fragmentado); var cargado = json.Cargar()!; cargado.ValidarIntegridad(); Igual(fragmentado.Cadena(c), cargado.Cadena(cargado.Raiz.Archivos.Single(x => x.Nombre == "c.txt")), "persistencia conserva FAT"); Igual(c.Contenido, cargado.Raiz.Archivos.Single(x => x.Nombre == "c.txt").Contenido, "persistencia conserva contenido"); } finally { File.Delete(ruta); }
+NuevoDiscoYGeometria();
+ArchivosYDirectorios();
+MovimientoYEliminacion();
+CrecimientoFragmentacionYAtomicidad();
+Persistencia();
 Console.WriteLine("Todas las pruebas del dominio FAT finalizaron correctamente.");
 
-static void Igual<T>(T esperado, T actual, string caso)
+static void NuevoDiscoYGeometria()
 {
-    if (!EqualityComparer<T>.Default.Equals(esperado, actual)) throw new Exception($"{caso}: se esperaba {esperado}, se obtuvo {actual}");
+    var d = Crear(8, 64);
+    Igual(TablaFat.Reservado, d.Fat.Entradas[0], "FAT[0] especial"); Igual(TablaFat.Reservado, d.Fat.Entradas[1], "FAT[1] especial");
+    Igual(2, d.Raiz.PrimerCluster, "raíz obtiene primer cluster de datos"); Igual(8L * 64, d.Configuracion.CapacidadBytes, "capacidad excluye FAT[0]/FAT[1]"); Igual(64L, d.EspacioUsado, "solo raíz consume espacio");
+    var temporal = d.CrearDirectorio(d.Raiz, "Temporal"); int clusterTemporal = temporal.PrimerCluster!.Value; d.EliminarDirectorio(d.Raiz, temporal); Igual(TablaFat.Libre, d.Fat.Entradas[clusterTemporal], "eliminar carpeta vacía libera cluster");
+    d.ValidarIntegridad();
 }
-static void Falla(Action accion, string caso)
+
+static void ArchivosYDirectorios()
 {
-    try { accion(); } catch { return; }
-    throw new Exception($"{caso}: se esperaba una excepción");
+    var d = Crear(12, 64); var carpeta = d.CrearDirectorio(d.Raiz, "Documentos");
+    Igual(3, carpeta.PrimerCluster, "crear carpeta consume First Fit"); var primero = carpeta.PrimerCluster; var cadena = d.Cadena(carpeta);
+    d.RenombrarDirectorio(d.Raiz, carpeta, "Universidad"); Igual(primero, carpeta.PrimerCluster, "renombrar carpeta conserva primer cluster"); Igual(cadena, d.Cadena(carpeta), "renombrar conserva cadena");
+    var archivo = d.CrearArchivo(carpeta, "tarea", new string('á', 40));
+    Igual(80L, archivo.TamanoBytes, "tamaño UTF-8"); Igual(2, d.ClustersUtilizados(archivo), "archivo multicluster"); Igual(128L, d.EspacioFisico(archivo), "espacio físico"); Igual(48L, d.DesperdicioInterno(archivo), "desperdicio");
+    var cadenaArchivo = d.Cadena(archivo); d.RenombrarArchivo(carpeta, archivo, "final.txt"); Igual(cadenaArchivo, d.Cadena(archivo), "renombrar archivo conserva FAT");
+    d.ValidarIntegridad();
 }
+
+static void MovimientoYEliminacion()
+{
+    var d = Crear(24, 64); var a = d.CrearDirectorio(d.Raiz, "A"); var hijo = d.CrearDirectorio(a, "Hijo"); var b = d.CrearDirectorio(d.Raiz, "B"); var f = d.CrearArchivo(hijo, "dato.txt", "contenido");
+    string cadenaA = d.Cadena(a), cadenaHijo = d.Cadena(hijo), cadenaF = d.Cadena(f);
+    d.MoverDirectorio(d.Raiz, b, a); Igual(cadenaA, d.Cadena(a), "mover carpeta conserva cadena"); Igual(cadenaHijo, d.Cadena(hijo), "mover conserva subdirectorio"); Igual(cadenaF, d.Cadena(f), "mover conserva archivo interno");
+    Falla(() => d.MoverDirectorio(b, hijo, a), "no mover dentro de descendiente"); Falla(() => d.MoverDirectorio(b, a, d.Raiz), "no mover raíz");
+    var duplicado = d.CrearDirectorio(d.Raiz, "A"); Falla(() => d.MoverDirectorio(b, d.Raiz, a), "duplicado en destino");
+    var ocupados = d.Clusters.Count(c => c.Estado == EstadoCluster.Ocupado); d.EliminarDirectorio(b, a, true); Verdadero(d.Clusters.Count(c => c.Estado == EstadoCluster.Ocupado) < ocupados, "borrado recursivo libera clusters");
+    d.EliminarDirectorio(d.Raiz, duplicado); d.ValidarIntegridad();
+}
+
+static void CrecimientoFragmentacionYAtomicidad()
+{
+    var d = Crear(12, 32); var bloqueador = d.CrearArchivo(d.Raiz, "bloque.txt", "x"); var carpeta = d.CrearDirectorio(d.Raiz, "Frag");
+    d.EliminarArchivo(d.Raiz, bloqueador); d.CrearArchivo(carpeta, "vacio.txt", "");
+    Igual("5 -> 3 -> EOC", d.Cadena(carpeta), "directorio fragmentado con First Fit");
+    d.EliminarArchivo(carpeta, carpeta.Archivos.Single()); Igual(1, d.ClustersUtilizadosDirectorio(carpeta), "directorio disminuye y libera cluster"); d.ValidarIntegridad();
+
+    var lleno = Crear(2, 64); var unica = lleno.CrearDirectorio(lleno.Raiz, "Unica"); lleno.CrearArchivo(unica, "uno.txt", ""); string antes = lleno.Cadena(unica);
+    Falla(() => lleno.CrearArchivo(unica, "dos.txt", ""), "falta de espacio al crecer directorio"); Igual(1, unica.Archivos.Count, "fallo atómico no agrega entrada"); Igual(antes, lleno.Cadena(unica), "fallo conserva cadena"); lleno.ValidarIntegridad();
+}
+
+static void Persistencia()
+{
+    var d = Crear(10, 64); var carpeta = d.CrearDirectorio(d.Raiz, "Datos"); var archivo = d.CrearArchivo(carpeta, "a.txt", "abc");
+    string ruta = Path.Combine(Path.GetTempPath(), $"fat32-{Guid.NewGuid():N}.json");
+    try
+    {
+        var json = new AlmacenamientoJson(ruta); json.Guardar(d); var cargado = json.Cargar()!; cargado.ValidarIntegridad(); var dc = cargado.Raiz.Directorios.Single();
+        Igual(d.Cadena(carpeta), cargado.Cadena(dc), "persistencia conserva directorio"); Igual(d.Cadena(archivo), cargado.Cadena(dc.Archivos.Single()), "persistencia conserva archivo"); Igual(TipoPropietario.Directorio, cargado.Clusters[dc.PrimerCluster!.Value].TipoPropietario, "persistencia conserva propietario");
+        File.WriteAllText(ruta, "{}"); Falla(() => json.Cargar(), "rechaza modelo antiguo sin versión");
+    }
+    finally { File.Delete(ruta); }
+}
+
+static DiscoVirtual Crear(int datos, int cluster) => DiscoVirtual.Crear(new ConfiguracionDisco { CantidadClusters = datos, TamanoClusterBytes = cluster });
+static void Igual<T>(T esperado, T actual, string caso) { if (!EqualityComparer<T>.Default.Equals(esperado, actual)) throw new Exception($"{caso}: esperado {esperado}, actual {actual}"); }
+static void Falla(Action accion, string caso) { try { accion(); } catch { return; } throw new Exception($"{caso}: se esperaba una excepción"); }
 static void Verdadero(bool valor, string caso) { if (!valor) throw new Exception($"{caso}: se esperaba verdadero"); }

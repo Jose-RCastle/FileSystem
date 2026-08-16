@@ -7,11 +7,10 @@ public sealed class TablaFat
     public const int Reservado = -3;
     public List<int> Entradas { get; set; } = [];
 
-    public static TablaFat Crear(int total, int reservados)
+    public static TablaFat Crear(int clustersDatos)
     {
-        if (total <= 2 || reservados < 2 || reservados >= total)
-            throw new ArgumentOutOfRangeException(nameof(total), "La geometría del disco no es válida.");
-        return new TablaFat { Entradas = Enumerable.Range(0, total).Select(i => i < reservados ? Reservado : Libre).ToList() };
+        if (clustersDatos <= 0) throw new ArgumentOutOfRangeException(nameof(clustersDatos), "Debe existir al menos un cluster de datos.");
+        return new TablaFat { Entradas = Enumerable.Range(0, clustersDatos + 2).Select(i => i < 2 ? Reservado : Libre).ToList() };
     }
 
     public List<int> BuscarLibres(int cantidad) => Entradas

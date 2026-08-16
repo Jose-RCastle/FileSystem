@@ -14,7 +14,11 @@ internal static class Program
         var almacenamiento = new AlmacenamientoJson(ruta);
         DiscoVirtual disco;
         try { disco = almacenamiento.Cargar() ?? DiscoVirtual.CrearPredeterminado(); }
-        catch { disco = DiscoVirtual.CrearPredeterminado(); }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"{ex.Message}\n\nSe creará un disco virtual nuevo. El archivo anterior no será sobrescrito hasta que guarde o cierre la aplicación.", "Disco incompatible", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            disco = DiscoVirtual.CrearPredeterminado();
+        }
         Application.Run(new ExploradorForm(disco, almacenamiento));
     }
 }
