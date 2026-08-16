@@ -39,23 +39,34 @@ internal sealed class ConfiguracionForm : Form
 {
     private readonly TextBox nombre = new();
     private readonly NumericUpDown clusters = new() { Minimum = 8, Maximum = 4096 };
-    private readonly NumericUpDown tamano = new() { Minimum = 64, Maximum = 1048576, Increment = 64 };
-    public ConfiguracionDisco Configuracion => new() { Nombre = nombre.Text.Trim(), CantidadClusters = (int)clusters.Value, TamanoClusterBytes = (int)tamano.Value };
+    private readonly ComboBox bytesSector = new() { DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox sectoresCluster = new() { DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox numeroFat = new() { DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly TextBox tamano = new() { ReadOnly = true };
+    private readonly Label capacidad = new() { AutoSize = true };
+    public ConfiguracionDisco Configuracion => new() { Nombre = nombre.Text.Trim(), CantidadClusters = (int)clusters.Value, BytesPorSector = (int)bytesSector.SelectedItem!, SectoresPorCluster = (int)sectoresCluster.SelectedItem!, NumeroDeFat = (int)numeroFat.SelectedItem! };
 
     public ConfiguracionForm(ConfiguracionDisco actual)
     {
-        Text = "Configuración del disco virtual FAT32"; Size = new Size(500, 355); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog;
-        nombre.Text = actual.Nombre; clusters.Value = actual.CantidadClusters; tamano.Value = actual.TamanoClusterBytes;
-        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(15), ColumnCount = 2, RowCount = 8 };
+        Text = "Configuración del volumen FAT32"; Size = new Size(540, 500); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog;
+        nombre.Text = actual.Nombre; clusters.Value = actual.CantidadClusters;
+        bytesSector.Items.Add(512); bytesSector.SelectedItem = actual.BytesPorSector;
+        sectoresCluster.Items.AddRange(ConfiguracionDisco.SectoresPorClusterPermitidos.Cast<object>().ToArray()); sectoresCluster.SelectedItem = actual.SectoresPorCluster;
+        numeroFat.Items.AddRange([1, 2]); numeroFat.SelectedItem = actual.NumeroDeFat;
+        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(15), ColumnCount = 2, RowCount = 14 };
         tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-        Agregar("Nombre del disco", nombre); Agregar("Clusters de datos", clusters); Agregar("Tamaño de cluster (bytes)", tamano); Agregar("Entradas FAT especiales", new Label { Text = "0 y 1 (no consumen capacidad)", AutoSize = true });
-        Agregar("Capacidad total calculada", new Label { Text = $"{(long)actual.CantidadClusters * actual.TamanoClusterBytes:N0} bytes", AutoSize = true });
+        Encabezado("Área física simulada"); Agregar("Nombre del volumen", nombre); Agregar("Bytes por sector", bytesSector); Agregar("Sectores por cluster", sectoresCluster); Agregar("Tamaño de cluster (solo lectura)", tamano);
+        Encabezado("Estructura FAT"); Agregar("Entradas especiales", new Label { Text = "FAT[0], FAT[1]", AutoSize = true }); Agregar("Número de FAT", numeroFat); Agregar("Cluster raíz", new Label { Text = "2", AutoSize = true }); Agregar("Clusters de datos", clusters);
+        Agregar("Capacidad área de datos", capacidad);
         Agregar("Algoritmo", new Label { Text = "First Fit", AutoSize = true });
-        var advertencia = new Label { Text = "ADVERTENCIA: Aplicar esta configuración formateará el disco virtual y eliminará su contenido.", ForeColor = Color.DarkRed, AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) }; tabla.Controls.Add(advertencia, 0, 6); tabla.SetColumnSpan(advertencia, 2);
+        var advertencia = new Label { Text = "La segunda FAT es un espejo conceptual; no hay recuperación automática.\nAplicar la configuración formateará el volumen.", ForeColor = Color.DarkRed, AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) }; tabla.Controls.Add(advertencia, 0, 12); tabla.SetColumnSpan(advertencia, 2);
         var panel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill };
         panel.Controls.Add(new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel }); panel.Controls.Add(new Button { Text = "Crear / Formatear disco", DialogResult = DialogResult.OK, AutoSize = true });
-        tabla.Controls.Add(panel, 0, 7); tabla.SetColumnSpan(panel, 2); Controls.Add(tabla);
+        tabla.Controls.Add(panel, 0, 13); tabla.SetColumnSpan(panel, 2); Controls.Add(tabla);
+        sectoresCluster.SelectedIndexChanged += (_, _) => Actualizar(); clusters.ValueChanged += (_, _) => Actualizar(); Actualizar();
         void Agregar(string texto, Control control) { int fila = tabla.Controls.Count / 2; tabla.Controls.Add(new Label { Text = texto, AutoSize = true, Anchor = AnchorStyles.Left }, 0, fila); control.Dock = DockStyle.Fill; tabla.Controls.Add(control, 1, fila); }
+        void Encabezado(string texto) { int fila = tabla.Controls.Count / 2; var l = new Label { Text = texto, AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) }; tabla.Controls.Add(l, 0, fila); tabla.SetColumnSpan(l, 2); tabla.Controls.Add(new Label(), 1, fila); }
+        void Actualizar() { if (bytesSector.SelectedItem is int b && sectoresCluster.SelectedItem is int s) { tamano.Text = $"{b * s:N0} bytes"; capacidad.Text = $"{(long)b * s * (int)clusters.Value:N0} bytes"; } }
     }
 }
 

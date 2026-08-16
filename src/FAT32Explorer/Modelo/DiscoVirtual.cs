@@ -5,7 +5,7 @@ namespace FAT32Explorer.Modelo;
 
 public sealed class DiscoVirtual
 {
-    public const int VersionActual = 3;
+    public const int VersionActual = 4;
     public const int TamanoEntradaDirectorio = 32;
     public int VersionModelo { get; set; } = VersionActual;
     public ConfiguracionDisco Configuracion { get; set; } = new();
@@ -21,6 +21,7 @@ public sealed class DiscoVirtual
 
     public static DiscoVirtual Crear(ConfiguracionDisco configuracion)
     {
+        configuracion.Validar();
         var disco = new DiscoVirtual
         {
             Configuracion = configuracion,
@@ -38,7 +39,7 @@ public sealed class DiscoVirtual
         var nuevo = new DirectorioVirtual { Nombre = nombre };
         int adicionales = ClustersNecesarios(TamanoLogicoDirectorio(nuevo)) + AdicionalesDirectorio(padre, 1);
         VerificarEspacio(adicionales, "No hay suficiente espacio para crear el directorio.");
-        RedimensionarDirectorio(nuevo); padre.Directorios.Add(nuevo); RedimensionarDirectorio(padre);
+        RedimensionarDirectorio(nuevo); padre.Directorios.Add(nuevo); RedimensionarDirectorio(padre); padre.Modificado = DateTime.Now;
         return nuevo;
     }
 
@@ -48,7 +49,7 @@ public sealed class DiscoVirtual
         var archivo = new ArchivoVirtual { Nombre = nombre, Contenido = contenido, TamanoBytes = Encoding.UTF8.GetByteCount(contenido) };
         int adicionales = ClustersNecesariosArchivo(archivo.TamanoBytes) + AdicionalesDirectorio(padre, 1);
         VerificarEspacio(adicionales, "No hay espacio suficiente para crear el archivo.");
-        RedimensionarArchivo(archivo); padre.Archivos.Add(archivo); RedimensionarDirectorio(padre);
+        RedimensionarArchivo(archivo); padre.Archivos.Add(archivo); RedimensionarDirectorio(padre); padre.Modificado = DateTime.Now;
         return archivo;
     }
 
@@ -78,7 +79,7 @@ public sealed class DiscoVirtual
     public void RenombrarDirectorio(DirectorioVirtual padre, DirectorioVirtual directorio, string nuevoNombre)
     {
         ValidarDirectorioMovible(padre, directorio); nuevoNombre = ValidarNombre(nuevoNombre, false); VerificarDuplicado(padre, nuevoNombre, directorio);
-        directorio.Nombre = nuevoNombre;
+        directorio.Nombre = nuevoNombre; directorio.Modificado = DateTime.Now;
     }
 
     public void EliminarArchivo(DirectorioVirtual padre, ArchivoVirtual archivo)
@@ -143,6 +144,12 @@ public sealed class DiscoVirtual
     private string FormatearCadena(int? primero) => primero is null ? "(vacío)" : string.Join(" -> ", Fat.Recorrer(primero)) + " -> EOC";
 
     public int ClustersUtilizados(ArchivoVirtual archivo) => Fat.Recorrer(archivo.PrimerCluster).Count;
+    public bool EstaFragmentado(ArchivoVirtual archivo) => EstaFragmentada(Fat.Recorrer(archivo.PrimerCluster));
+    public bool EstaFragmentado(DirectorioVirtual directorio) => EstaFragmentada(Fat.Recorrer(directorio.PrimerCluster));
+    private static bool EstaFragmentada(IReadOnlyList<int> cadena) => cadena.Zip(cadena.Skip(1), (a, b) => b != a + 1).Any(x => x);
+    [JsonIgnore] public int ClustersLibres => Clusters.Count(c => c.Estado == EstadoCluster.Libre);
+    [JsonIgnore] public int ClustersOcupados => Clusters.Count(c => c.Estado == EstadoCluster.Ocupado);
+    [JsonIgnore] public int? PrimerClusterLibreSugerido => Clusters.FirstOrDefault(c => c.Estado == EstadoCluster.Libre)?.Numero;
     public long EspacioFisico(ArchivoVirtual archivo) => ClustersUtilizados(archivo) * (long)Configuracion.TamanoClusterBytes;
     public long DesperdicioInterno(ArchivoVirtual archivo) => EspacioFisico(archivo) - archivo.TamanoBytes;
     public long TamanoLogicoDirectorio(DirectorioVirtual d) => (1L + d.Archivos.Count + d.Directorios.Count) * TamanoEntradaDirectorio;
@@ -157,6 +164,8 @@ public sealed class DiscoVirtual
     public void ValidarIntegridad()
     {
         if (VersionModelo != VersionActual) throw new InvalidDataException("El disco guardado pertenece a una versión anterior del simulador y debe recrearse.");
+        try { Configuracion.Validar(); } catch (Exception ex) { throw new InvalidDataException("La geometría del volumen no es válida.", ex); }
+        if (Configuracion.PrimerClusterDatos < 2 || Configuracion.ClusterRaiz != 2) throw new InvalidDataException("El primer cluster de datos o el cluster raíz no es válido.");
         if (Fat.Entradas.Count != Configuracion.CantidadClusters + 2 || Clusters.Count != Configuracion.CantidadClusters + 2) throw new InvalidDataException("La geometría FAT no coincide con el área de datos.");
         if (Fat.Entradas[0] != TablaFat.Reservado || Fat.Entradas[1] != TablaFat.Reservado) throw new InvalidDataException("FAT[0] y FAT[1] deben ser entradas especiales RESERVED.");
         var objetos = new Dictionary<string, (TipoPropietario tipo, int? primero, int necesarios)>();
@@ -186,6 +195,8 @@ public sealed class DiscoVirtual
             if (i >= 2 && Fat.Entradas[i] == TablaFat.Libre && (c.Estado != EstadoCluster.Libre || c.PropietarioId is not null || c.TipoPropietario is not null)) throw new InvalidDataException("Un cluster libre conserva propietario.");
             if (i >= 2 && c.Estado == EstadoCluster.Ocupado && !usados.Contains(i)) throw new InvalidDataException("Existe un cluster ocupado huérfano.");
         }
+        if (ClustersOcupados + ClustersLibres != Configuracion.CantidadClusters || EspacioUsado + EspacioLibre != Configuracion.CapacidadBytes) throw new InvalidDataException("El espacio usado/libre no coincide con la geometría.");
+        if (Raiz.PrimerCluster is null || Raiz.PrimerCluster < Configuracion.PrimerClusterDatos) throw new InvalidDataException("El directorio raíz no usa un cluster de datos válido.");
     }
 
     private int ClustersNecesarios(long bytes) => Math.Max(1, checked((int)Math.Ceiling(bytes / (double)Configuracion.TamanoClusterBytes)));
