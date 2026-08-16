@@ -13,7 +13,7 @@ public sealed class ExploradorForm : Form
     private readonly DataGridView fat = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
     private readonly FlowLayoutPanel mapa = new() { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true, BackColor = Color.White };
     private readonly ToolStripStatusLabel estado = new();
-    private readonly ToolStripLabel ruta = new() { BackColor = Color.White, BorderStyle = Border3DStyle.Flat, Margin = new Padding(12, 4, 6, 4), Padding = new Padding(10, 3, 10, 3), AutoSize = false, Width = 390, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly ToolStripLabel ruta = new() { BackColor = Color.White, Margin = new Padding(12, 4, 6, 4), Padding = new Padding(10, 3, 10, 3), AutoSize = false, Width = 390, TextAlign = ContentAlignment.MiddleLeft };
     private readonly ToolStripButton atras = new("←") { ToolTipText = "Atrás" };
     private readonly ToolStripButton subir = new("↑") { ToolTipText = "Directorio superior" };
     private readonly Label detalles = new() { Dock = DockStyle.Fill, Padding = new Padding(14), ForeColor = Color.FromArgb(45, 50, 58) };
@@ -45,7 +45,7 @@ public sealed class ExploradorForm : Form
         var izquierda = new Panel { Dock = DockStyle.Fill, BackColor = EstiloVisual.Superficie, Padding = new Padding(10) };
         var tituloArbol = new Label { Text = "DIRECTORIOS", Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario, Padding = new Padding(4, 8, 0, 0) };
         izquierda.Controls.Add(arbol); izquierda.Controls.Add(tituloArbol); superior.Panel1.Controls.Add(izquierda);
-        var derecha = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel2, SplitterDistance = 690, Panel2MinSize = 190, SplitterWidth = 1 };
+        var derecha = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel2, SplitterWidth = 1 };
         derecha.Panel1.Controls.Add(contenido);
         var rapidas = new Panel { Dock = DockStyle.Fill, BackColor = EstiloVisual.Superficie, Padding = new Padding(12) };
         rapidas.Controls.Add(detalles); rapidas.Controls.Add(capacidadTexto); rapidas.Controls.Add(capacidad); rapidas.Controls.Add(new Label { Text = "DISCO FAT32", Dock = DockStyle.Top, Height = 32, Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario });
@@ -57,6 +57,8 @@ public sealed class ExploradorForm : Form
         principal.Panel1.Controls.Add(superior); principal.Panel2.Controls.Add(panelFat);
         var status = new StatusStrip(); status.Items.Add(estado);
         Controls.Add(principal); Controls.Add(status); Controls.Add(barra); Controls.Add(menu);
+        Shown += (_, _) =>{derecha.Panel2MinSize = 190;int distanciaDeseada = derecha.Width - 260;if (distanciaDeseada > derecha.Panel1MinSize &&distanciaDeseada < derecha.Width - derecha.Panel2MinSize){
+                derecha.SplitterDistance = distanciaDeseada;}};
         contenido.MouseDoubleClick += (_, _) => AbrirSeleccion(); contenido.SelectedIndexChanged += (_, _) => RefrescarFat();
         arbol.AfterSelect += (_, e) => { if (!navegando && e.Node?.Tag is DirectorioVirtual d) NavegarA(d); };
         atras.Click += (_, _) => IrAtras(); subir.Click += (_, _) => Subir(); alternarFat.Click += (_, _) => AlternarFat();
