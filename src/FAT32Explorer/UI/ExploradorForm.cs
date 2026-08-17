@@ -8,17 +8,17 @@ public sealed class ExploradorForm : Form
     private DiscoVirtual disco;
     private readonly AlmacenamientoJson almacenamiento;
     private DirectorioVirtual actual;
-    private readonly TreeView arbol = new() { Dock = DockStyle.Fill, HideSelection = false };
+    private readonly TreeView arbol = new() { Dock = DockStyle.Fill, HideSelection = false, Scrollable = true };
     private readonly ListView contenido = new() { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true };
     private readonly DataGridView fat = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
     private readonly FlowLayoutPanel mapa = new() { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true, BackColor = Color.White };
     private readonly ToolStripStatusLabel estado = new();
-    private readonly ToolStripLabel ruta = new() { BackColor = Color.White, Margin = new Padding(12, 4, 6, 4), Padding = new Padding(10, 3, 10, 3), AutoSize = false, Width = 390, TextAlign = ContentAlignment.MiddleLeft };
-    private readonly ToolStripButton atras = new("←") { ToolTipText = "Atrás" };
-    private readonly ToolStripButton subir = new("↑") { ToolTipText = "Directorio superior" };
+    private readonly ToolStripLabel ruta = new() { BackColor = Color.White, Margin = new Padding(12, 3, 6, 3), Padding = new Padding(10, 4, 10, 4), AutoSize = false, Width = 390, TextAlign = ContentAlignment.MiddleLeft, AutoToolTip = true };
+    private readonly ToolStripButton atras = new() { ToolTipText = "Atrás", Image = IconosVisuales.Flecha(false), DisplayStyle = ToolStripItemDisplayStyle.Image };
+    private readonly ToolStripButton subir = new() { ToolTipText = "Directorio superior", Image = IconosVisuales.Flecha(true), DisplayStyle = ToolStripItemDisplayStyle.Image };
     private readonly Label detalles = new() { Dock = DockStyle.Fill, Padding = new Padding(14), ForeColor = Color.FromArgb(45, 50, 58) };
     private readonly ProgressBar capacidad = new() { Dock = DockStyle.Top, Height = 8, Maximum = 100 };
-    private readonly Label capacidadTexto = new() { Dock = DockStyle.Top, Height = 34, Padding = new Padding(0, 7, 0, 0), ForeColor = Color.DimGray };
+    private readonly Label capacidadTexto = new() { Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(0, 7, 0, 5), ForeColor = Color.DimGray };
     private readonly Panel panelFat = new() { Dock = DockStyle.Fill };
     private readonly Button alternarFat = new() { Dock = DockStyle.Top, Height = 36, FlatStyle = FlatStyle.Flat, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(12, 0, 0, 0), Text = "▼  Visualización FAT32" };
     private SplitContainer principal = null!;
@@ -36,29 +36,32 @@ public sealed class ExploradorForm : Form
         this.disco = disco; this.almacenamiento = almacenamiento; actual = disco.Raiz;
         Text = "FAT32Explorer — Explorador y simulador FAT32"; WindowState = FormWindowState.Maximized; MinimumSize = new Size(1050, 680); EstiloVisual.Aplicar(this);
         contenido.Columns.Add("Nombre", 260); contenido.Columns.Add("Tipo", 110); contenido.Columns.Add("Tamaño lógico", 110); contenido.Columns.Add("Primer cluster", 110); contenido.Columns.Add("Modificado", 170);
-        var iconos = new ImageList { ColorDepth = ColorDepth.Depth32Bit, ImageSize = new Size(16, 16) }; iconos.Images.Add("disco", SystemIcons.WinLogo.ToBitmap()); iconos.Images.Add("carpeta", SystemIcons.Application.ToBitmap()); iconos.Images.Add("txt", SystemIcons.Information.ToBitmap()); arbol.ImageList = iconos; contenido.SmallImageList = iconos;
+        var iconos = new ImageList { ColorDepth = ColorDepth.Depth32Bit, ImageSize = new Size(20, 20) }; iconos.Images.Add("disco", IconosVisuales.Disco()); iconos.Images.Add("carpeta", IconosVisuales.Carpeta()); iconos.Images.Add("txt", IconosVisuales.Texto()); arbol.ImageList = iconos; contenido.SmallImageList = iconos;
         fat.Columns.Add("numero", "Cluster / Entrada"); fat.Columns.Add("estado", "Estado"); fat.Columns.Add("siguiente", "Valor FAT / Siguiente"); fat.Columns.Add("propietario", "Propietario"); fat.Columns.Add("tipo", "Tipo");
         fat.AllowUserToDeleteRows = false; fat.AllowUserToResizeRows = false; fat.SelectionMode = DataGridViewSelectionMode.FullRowSelect; fat.RowTemplate.Height = 28; fat.ColumnHeadersHeight = 34; fat.BackgroundColor = Color.White; fat.BorderStyle = BorderStyle.None;
         var menu = CrearMenu(); MainMenuStrip = menu;
         var barra = CrearBarraHerramientas();
-        var superior = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 235, FixedPanel = FixedPanel.Panel1, Panel1MinSize = 210, SplitterWidth = 1, BackColor = EstiloVisual.Borde };
+        var superior = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, SplitterWidth = 4, BackColor = EstiloVisual.Borde };
         var izquierda = new Panel { Dock = DockStyle.Fill, BackColor = EstiloVisual.Superficie, Padding = new Padding(10) };
-        var tituloArbol = new Label { Text = "DIRECTORIOS", Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario, Padding = new Padding(4, 8, 0, 0) };
+        var tituloArbol = new Label { Text = "DIRECTORIOS", Dock = DockStyle.Top, AutoSize = true, MinimumSize = new Size(0, 34), Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario, Padding = new Padding(4, 8, 0, 0) };
         izquierda.Controls.Add(arbol); izquierda.Controls.Add(tituloArbol); superior.Panel1.Controls.Add(izquierda);
         var derecha = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel2, SplitterWidth = 1 };
         derecha.Panel1.Controls.Add(contenido);
-        var rapidas = new Panel { Dock = DockStyle.Fill, BackColor = EstiloVisual.Superficie, Padding = new Padding(12) };
-        rapidas.Controls.Add(detalles); rapidas.Controls.Add(capacidadTexto); rapidas.Controls.Add(capacidad); rapidas.Controls.Add(new Label { Text = "DISCO FAT32", Dock = DockStyle.Top, Height = 32, Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario });
+        var rapidas = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = EstiloVisual.Superficie, Padding = new Padding(14), ColumnCount = 1, RowCount = 5 };
+        rapidas.RowStyles.Add(new RowStyle(SizeType.AutoSize)); rapidas.RowStyles.Add(new RowStyle(SizeType.Absolute, 12)); rapidas.RowStyles.Add(new RowStyle(SizeType.AutoSize)); rapidas.RowStyles.Add(new RowStyle(SizeType.Absolute, 1)); rapidas.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        rapidas.Controls.Add(new Label { Text = "DISCO FAT32", AutoSize = true, MinimumSize = new Size(0, 28), Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario }, 0, 0);
+        capacidad.Dock = DockStyle.Fill; rapidas.Controls.Add(capacidad, 0, 1); rapidas.Controls.Add(capacidadTexto, 0, 2); rapidas.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = EstiloVisual.Borde, Margin = new Padding(0, 6, 0, 6) }, 0, 3); rapidas.Controls.Add(detalles, 0, 4);
         derecha.Panel2.Controls.Add(rapidas); superior.Panel2.Controls.Add(derecha);
         var vistasFat = new TabControl { Dock = DockStyle.Fill }; var tabTabla = new TabPage("Tabla FAT") { BackColor = Color.White }; var tabMapa = new TabPage("Mapa de clusters") { BackColor = Color.White };
         tabTabla.Controls.Add(fat); tabMapa.Controls.Add(mapa); tabMapa.Controls.Add(CrearLeyenda()); vistasFat.TabPages.AddRange([tabTabla, tabMapa]);
         panelFat.Controls.Add(vistasFat); panelFat.Controls.Add(alternarFat);
-        principal = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 410, Panel2MinSize = 36, SplitterWidth = 4 };
+        principal = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, Panel2MinSize = 36, SplitterWidth = 4 };
         principal.Panel1.Controls.Add(superior); principal.Panel2.Controls.Add(panelFat);
         var status = new StatusStrip(); status.Items.Add(estado);
         Controls.Add(principal); Controls.Add(status); Controls.Add(barra); Controls.Add(menu);
-        Shown += (_, _) =>{derecha.Panel2MinSize = 190;int distanciaDeseada = derecha.Width - 260;if (distanciaDeseada > derecha.Panel1MinSize &&distanciaDeseada < derecha.Width - derecha.Panel2MinSize){
-                derecha.SplitterDistance = distanciaDeseada;}};
+        Shown += (_, _) => { AjustarDivisor(superior, 260); superior.Panel1MinSize = 220; superior.Panel2MinSize = 500; AjustarDivisor(derecha, derecha.Width - 280); derecha.Panel1MinSize = 320; derecha.Panel2MinSize = 240; AjustarFatInicial(); principal.Panel1MinSize = 220; };
+        superior.SizeChanged += (_, _) => AjustarDivisor(superior, Math.Min(260, superior.Width - superior.Panel2MinSize - superior.SplitterWidth));
+        derecha.SizeChanged += (_, _) => AjustarDivisor(derecha, derecha.Width - 280);
         contenido.MouseDoubleClick += (_, _) => AbrirSeleccion(); contenido.SelectedIndexChanged += (_, _) => RefrescarFat();
         arbol.AfterSelect += (_, e) => { if (!navegando && e.Node?.Tag is DirectorioVirtual d) NavegarA(d); };
         atras.Click += (_, _) => IrAtras(); subir.Click += (_, _) => Subir(); alternarFat.Click += (_, _) => AlternarFat();
@@ -69,12 +72,13 @@ public sealed class ExploradorForm : Form
 
     private ToolStrip CrearBarraHerramientas()
     {
-        var barra = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Height = 42, Padding = new Padding(8, 4, 8, 4), BackColor = Color.FromArgb(249, 250, 252) };
-        var actualizar = new ToolStripButton("⟳") { ToolTipText = "Actualizar" }; actualizar.Click += (_, _) => RefrescarTodo();
-        var carpeta = new ToolStripButton("＋ Carpeta") { ToolTipText = "Nueva carpeta" }; carpeta.Click += (_, _) => NuevaCarpeta();
-        var archivo = new ToolStripButton("＋ TXT") { ToolTipText = "Nuevo archivo TXT" }; archivo.Click += (_, _) => NuevoArchivo();
-        var propiedades = new ToolStripButton("ⓘ Propiedades") { ToolTipText = "Propiedades del elemento seleccionado" }; propiedades.Click += (_, _) => PropiedadesSeleccion();
+        var barra = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, AutoSize = true, MinimumSize = new Size(0, 42), Padding = new Padding(10, 5, 10, 5), ImageScalingSize = new Size(20, 20), BackColor = Color.FromArgb(249, 250, 252) };
+        var actualizar = new ToolStripButton { ToolTipText = "Actualizar", Image = IconosVisuales.Actualizar(), DisplayStyle = ToolStripItemDisplayStyle.Image, Margin = new Padding(4, 1, 4, 2) }; actualizar.Click += (_, _) => RefrescarTodo();
+        var carpeta = new ToolStripButton("Carpeta", IconosVisuales.Carpeta()) { ToolTipText = "Nueva carpeta", Margin = new Padding(6, 1, 6, 2) }; carpeta.Click += (_, _) => NuevaCarpeta();
+        var archivo = new ToolStripButton("TXT", IconosVisuales.Texto()) { ToolTipText = "Nuevo archivo TXT", Margin = new Padding(6, 1, 6, 2) }; archivo.Click += (_, _) => NuevoArchivo();
+        var propiedades = new ToolStripButton("Propiedades", IconosVisuales.Informacion()) { ToolTipText = "Propiedades del elemento seleccionado", Margin = new Padding(6, 1, 6, 2) }; propiedades.Click += (_, _) => PropiedadesSeleccion();
         barra.Items.AddRange([atras, subir, actualizar, new ToolStripSeparator(), carpeta, archivo, new ToolStripSeparator(), propiedades, ruta]);
+        barra.SizeChanged += (_, _) => ruta.Width = Math.Max(140, barra.DisplayRectangle.Right - ruta.Bounds.Left - 8);
         return barra;
     }
 
@@ -86,12 +90,24 @@ public sealed class ExploradorForm : Form
         return leyenda;
     }
 
+    private static void AjustarDivisor(SplitContainer divisor, int deseado)
+    {
+        if (divisor.Width <= 0 || divisor.Height <= 0) return;
+        int total = divisor.Orientation == Orientation.Vertical ? divisor.ClientSize.Width : divisor.ClientSize.Height;
+        int minimo = divisor.Panel1MinSize;
+        int maximo = total - divisor.Panel2MinSize - divisor.SplitterWidth;
+        if (maximo >= minimo) divisor.SplitterDistance = Math.Clamp(deseado, minimo, maximo);
+    }
+
+    private void AjustarFatInicial() => AjustarDivisor(principal, principal.Height - alturaFat);
+
     private void AlternarFat()
     {
+        if (principal.ClientSize.Height <= 0) return;
         fatExpandida = !fatExpandida;
         panelFat.Controls[0].Visible = fatExpandida;
-        if (fatExpandida) principal.SplitterDistance = Math.Max(100, principal.Height - alturaFat);
-        else { alturaFat = principal.Panel2.Height; principal.SplitterDistance = Math.Max(100, principal.Height - alternarFat.Height); }
+        if (fatExpandida) AjustarDivisor(principal, principal.Height - alturaFat);
+        else { alturaFat = Math.Max(180, principal.Panel2.Height); AjustarDivisor(principal, principal.Height - alternarFat.Height); }
         alternarFat.Text = fatExpandida ? "▼  Visualización FAT32" : "▶  Visualización FAT32";
     }
 
@@ -164,9 +180,12 @@ public sealed class ExploradorForm : Form
         if (Seleccionado()?.Tag is not object elemento) { MessageBox.Show(this, "Seleccione un archivo o carpeta."); return; }
         var destinos = disco.TodosLosDirectorios().Where(d => !ReferenceEquals(d, actual)).ToList();
         if (destinos.Count == 0) { MessageBox.Show(this, "No hay otro directorio disponible."); return; }
-        using var dialogo = new Form { Text = "Mover a...", Size = new Size(380, 170), StartPosition = FormStartPosition.CenterParent };
-        var combo = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = destinos, DisplayMember = "Nombre" };
-        dialogo.Controls.Add(new Button { Text = "Mover", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom }); dialogo.Controls.Add(combo);
+        using var dialogo = new Form { Text = "Mover a...", ClientSize = new Size(420, 145), MinimumSize = new Size(380, 180), StartPosition = FormStartPosition.CenterParent };
+        EstiloVisual.Aplicar(dialogo);
+        var combo = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = destinos, DisplayMember = "Nombre" };
+        var mover = EstiloVisual.Boton("Mover", DialogResult.OK); var cancelar = EstiloVisual.Boton("Cancelar", DialogResult.Cancel);
+        var botones = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false }; botones.Controls.Add(cancelar); botones.Controls.Add(mover);
+        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(15), ColumnCount = 1, RowCount = 3 }; tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize)); tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize)); tabla.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); tabla.Controls.Add(new Label { Text = "Directorio de destino", AutoSize = true, Margin = new Padding(0, 0, 0, 6) }, 0, 0); tabla.Controls.Add(combo, 0, 1); tabla.Controls.Add(botones, 0, 2); dialogo.Controls.Add(tabla); dialogo.AcceptButton = mover; dialogo.CancelButton = cancelar;
         if (dialogo.ShowDialog(this) == DialogResult.OK && combo.SelectedItem is DirectorioVirtual destino)
             Ejecutar(() => { if (elemento is ArchivoVirtual archivo) disco.MoverArchivo(actual, destino, archivo); else disco.MoverDirectorio(actual, destino, (DirectorioVirtual)elemento); });
     }
