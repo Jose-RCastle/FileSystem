@@ -9,17 +9,20 @@ internal sealed class EditorTextoForm : Form
     public string Nombre => nombre.Text.Trim();
     public string Contenido => contenido.Text;
 
-    private readonly Label metricas = new() { Dock = DockStyle.Bottom, Height = 28, ForeColor = Color.DimGray, Padding = new Padding(10, 5, 0, 0) };
+    private readonly Label metricas = new() { AutoSize = true, Dock = DockStyle.Fill, ForeColor = Color.DimGray, Padding = new Padding(0, 6, 0, 6) };
     public EditorTextoForm(ArchivoVirtual? archivo, int tamanoCluster)
     {
         Text = archivo is null ? "Nuevo archivo TXT" : $"Editar - {archivo.Nombre}";
         Size = new Size(760, 560); MinimumSize = new Size(560, 420); StartPosition = FormStartPosition.CenterParent; EstiloVisual.Aplicar(this);
         nombre.Text = archivo?.Nombre ?? "nuevo.txt"; contenido.Text = archivo?.Contenido ?? "";
         nombre.Margin = new Padding(10); contenido.BorderStyle = BorderStyle.FixedSingle;
-        var botones = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 52, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(10, 8, 10, 8), BackColor = EstiloVisual.Fondo };
-        botones.Controls.Add(new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, AutoSize = true });
-        botones.Controls.Add(new Button { Text = "Guardar", DialogResult = DialogResult.OK, AutoSize = true });
-        Controls.Add(contenido); Controls.Add(metricas); Controls.Add(new Label { Text = "Nombre del archivo", Dock = DockStyle.Top, Height = 28, Padding = new Padding(0, 7, 0, 0), Font = new Font("Segoe UI Semibold", 9) }); Controls.Add(nombre); Controls.Add(new Label { Text = "ARCHIVO TXT FAT32", Dock = DockStyle.Top, Height = 38, Padding = new Padding(0, 10, 0, 0), ForeColor = EstiloVisual.TextoSecundario }); Controls.Add(botones); Padding = new Padding(12, 0, 12, 0);
+        var botones = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(0, 6, 0, 6), BackColor = EstiloVisual.Fondo };
+        botones.Controls.Add(EstiloVisual.Boton("Cancelar", DialogResult.Cancel));
+        botones.Controls.Add(EstiloVisual.Boton("Guardar", DialogResult.OK));
+        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, Padding = new Padding(12, 4, 12, 4) };
+        tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize)); tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize)); tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize)); tabla.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize)); tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        tabla.Controls.Add(new Label { Text = "ARCHIVO TXT FAT32", AutoSize = true, Padding = new Padding(0, 8, 0, 8), ForeColor = EstiloVisual.TextoSecundario }, 0, 0);
+        tabla.Controls.Add(new Label { Text = "Nombre del archivo", AutoSize = true, Padding = new Padding(0, 4, 0, 4), Font = new Font("Segoe UI Semibold", 9) }, 0, 1); tabla.Controls.Add(nombre, 0, 2); tabla.Controls.Add(contenido, 0, 3); tabla.Controls.Add(metricas, 0, 4); tabla.Controls.Add(botones, 0, 5); Controls.Add(tabla);
         AcceptButton = (Button)botones.Controls[1]; CancelButton = (Button)botones.Controls[0];
         contenido.TextChanged += (_, _) => ActualizarMetricas(); ActualizarMetricas();
         void ActualizarMetricas() { int bytes = System.Text.Encoding.UTF8.GetByteCount(contenido.Text); int clusters = bytes == 0 ? 0 : (int)Math.Ceiling(bytes / (double)tamanoCluster); metricas.Text = $"Tamaño UTF-8 actual: {bytes:N0} bytes    ·    Clusters necesarios: {clusters}"; }
@@ -30,11 +33,14 @@ internal static class Entrada
 {
     public static string? Pedir(IWin32Window owner, string titulo, string etiqueta, string inicial = "")
     {
-        using var form = new Form { Text = titulo, Size = new Size(410, 175), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, Font = new Font("Segoe UI", 9), BackColor = EstiloVisual.Fondo };
-        var caja = new TextBox { Text = inicial, Left = 15, Top = 35, Width = 340 };
-        var aceptar = new Button { Text = "Aceptar", DialogResult = DialogResult.OK, Left = 190, Top = 70 };
-        form.Controls.AddRange([new Label { Text = etiqueta, Left = 15, Top = 12, AutoSize = true }, caja, aceptar, new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Left = 280, Top = 70 }]);
-        form.AcceptButton = aceptar;
+        using var form = new Form { Text = titulo, ClientSize = new Size(420, 150), MinimumSize = new Size(380, 180), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false };
+        EstiloVisual.Aplicar(form);
+        var caja = new TextBox { Text = inicial, Dock = DockStyle.Fill };
+        var aceptar = EstiloVisual.Boton("Aceptar", DialogResult.OK); var cancelar = EstiloVisual.Boton("Cancelar", DialogResult.Cancel);
+        var botones = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false }; botones.Controls.Add(cancelar); botones.Controls.Add(aceptar);
+        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(15), ColumnCount = 1, RowCount = 3 }; tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize)); tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize)); tabla.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        tabla.Controls.Add(new Label { Text = etiqueta, AutoSize = true, Margin = new Padding(0, 0, 0, 6) }, 0, 0); tabla.Controls.Add(caja, 0, 1); tabla.Controls.Add(botones, 0, 2); form.Controls.Add(tabla);
+        form.AcceptButton = aceptar; form.CancelButton = cancelar;
         return form.ShowDialog(owner) == DialogResult.OK ? caja.Text : null;
     }
 }
@@ -64,8 +70,8 @@ internal sealed class ConfiguracionForm : Form
         Agregar("Capacidad área de datos", capacidad);
         Agregar("Algoritmo", new Label { Text = "First Fit", AutoSize = true });
         var advertencia = new Label { Text = "La segunda FAT es un espejo conceptual; no hay recuperación automática.\nAplicar la configuración formateará el volumen.", ForeColor = Color.DarkRed, AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) }; tabla.Controls.Add(advertencia, 0, 12); tabla.SetColumnSpan(advertencia, 2);
-        var panel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill };
-        panel.Controls.Add(new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel }); panel.Controls.Add(new Button { Text = "Crear / Formatear disco", DialogResult = DialogResult.OK, AutoSize = true });
+        var panel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Dock = DockStyle.Fill };
+        panel.Controls.Add(EstiloVisual.Boton("Cancelar", DialogResult.Cancel)); panel.Controls.Add(EstiloVisual.Boton("Crear / Formatear disco", DialogResult.OK));
         tabla.Controls.Add(panel, 0, 13); tabla.SetColumnSpan(panel, 2); Controls.Add(tabla);
         sectoresCluster.SelectedIndexChanged += (_, _) => Actualizar(); clusters.ValueChanged += (_, _) => Actualizar(); Actualizar();
         void Agregar(string texto, Control control) { int fila = tabla.Controls.Count / 2; tabla.Controls.Add(new Label { Text = texto, AutoSize = true, Anchor = AnchorStyles.Left }, 0, fila); control.Dock = DockStyle.Fill; tabla.Controls.Add(control, 1, fila); }
@@ -86,6 +92,6 @@ internal sealed class ConfiguracionSistemaForm : Form
         tabla.Controls.Add(new Label { Text = "Nombre del SO", AutoSize = true }, 0, 0); tabla.Controls.Add(nombre, 1, 0); tabla.Controls.Add(new Label { Text = "Usuario", AutoSize = true }, 0, 1); tabla.Controls.Add(usuario, 1, 1);
         string[] info = ["Sistema de archivos: FAT32", "Modo: Simulación", "Unidad raíz: C:\\", "Archivos soportados: TXT"];
         for (int i = 0; i < info.Length; i++) { var l = new Label { Text = info[i], AutoSize = true, ForeColor = Color.DimGray }; tabla.Controls.Add(l, 0, i + 2); tabla.SetColumnSpan(l, 2); }
-        var botones = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; botones.Controls.Add(new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel }); botones.Controls.Add(new Button { Text = "Guardar", DialogResult = DialogResult.OK }); tabla.Controls.Add(botones, 0, 6); tabla.SetColumnSpan(botones, 2); Controls.Add(tabla);
+        var botones = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Dock = DockStyle.Fill }; botones.Controls.Add(EstiloVisual.Boton("Cancelar", DialogResult.Cancel)); botones.Controls.Add(EstiloVisual.Boton("Guardar", DialogResult.OK)); tabla.Controls.Add(botones, 0, 6); tabla.SetColumnSpan(botones, 2); Controls.Add(tabla);
     }
 }

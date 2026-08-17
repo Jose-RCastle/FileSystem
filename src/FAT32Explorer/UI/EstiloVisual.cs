@@ -24,4 +24,15 @@ internal static class EstiloVisual
     {
         Text = texto, AutoSize = true, ForeColor = TextoSecundario
     };
+
+    public static Button Boton(string texto, DialogResult resultado = DialogResult.None) => new()
+    {
+        Text = texto,
+        DialogResult = resultado,
+        AutoSize = true,
+        AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        MinimumSize = new Size(0, 32),
+        Padding = new Padding(14, 4, 14, 4),
+        Margin = new Padding(6, 3, 0, 3)
+    };
 }

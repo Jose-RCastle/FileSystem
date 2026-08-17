@@ -9,15 +9,15 @@ internal sealed class EstructuraFat32Form : Form
     {
         Text = "Estructura FAT32 — vista didáctica"; Size = new Size(1120, 720); MinimumSize = new Size(900, 600); StartPosition = FormStartPosition.CenterParent;
         EstiloVisual.Aplicar(this);
-        var cabecera = new Panel { Dock = DockStyle.Top, Height = 72, Padding = new Padding(22, 13, 0, 0), BackColor = Color.White };
-        cabecera.Controls.Add(new Label { Text = "Estructura del volumen FAT32", Dock = DockStyle.Top, Height = 29, Font = new Font("Segoe UI Semibold", 16), ForeColor = Color.FromArgb(28, 34, 42) });
-        cabecera.Controls.Add(new Label { Text = "Simulación didáctica · la información se deriva del modelo actual", Dock = DockStyle.Bottom, Height = 25, ForeColor = EstiloVisual.TextoSecundario });
-        var regiones = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, Padding = new Padding(16), BackColor = EstiloVisual.Fondo };
+        var cabecera = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(22, 12, 12, 10), BackColor = Color.White, ColumnCount = 1, RowCount = 2 };
+        cabecera.Controls.Add(new Label { Text = "Estructura del volumen FAT32", AutoSize = true, Dock = DockStyle.Fill, Font = new Font("Segoe UI Semibold", 16), ForeColor = Color.FromArgb(28, 34, 42) }, 0, 0);
+        cabecera.Controls.Add(new Label { Text = "Simulación didáctica · la información se deriva del modelo actual", AutoSize = true, Dock = DockStyle.Fill, ForeColor = EstiloVisual.TextoSecundario }, 0, 1);
+        var regiones = new TableLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 5, Padding = new Padding(16), BackColor = EstiloVisual.Fondo };
         regiones.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30)); regiones.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 30)); regiones.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30)); regiones.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 30)); regiones.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
         regiones.Controls.Add(CrearBoot(disco), 0, 0); regiones.Controls.Add(Flecha("→"), 1, 0); regiones.Controls.Add(CrearFat(disco, seleccionado), 2, 0); regiones.Controls.Add(Flecha("→"), 3, 0); regiones.Controls.Add(CrearDatos(disco, seleccionado), 4, 0);
-        var pie = new Panel { Dock = DockStyle.Bottom, Height = 105, Padding = new Padding(20, 12, 20, 12), BackColor = Color.White };
-        pie.Controls.Add(new Label { Text = "FLUJO DE ACCESO", Dock = DockStyle.Top, Height = 22, Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario });
-        pie.Controls.Add(new Label { Text = "Entrada del directorio   →   PrimerCluster   →   FAT   →   Cadena de clusters   →   Datos", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(232, 243, 253), Font = new Font("Segoe UI Semibold", 11), ForeColor = EstiloVisual.Acento });
+        var pie = new TableLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(20, 10, 20, 12), BackColor = Color.White, ColumnCount = 1, RowCount = 2 };
+        pie.Controls.Add(new Label { Text = "FLUJO DE ACCESO", AutoSize = true, Dock = DockStyle.Fill, Font = new Font("Segoe UI Semibold", 9), ForeColor = EstiloVisual.TextoSecundario }, 0, 0);
+        pie.Controls.Add(new Label { Text = "Entrada del directorio   →   PrimerCluster   →   FAT   →   Cadena de clusters   →   Datos", AutoSize = true, MinimumSize = new Size(0, 48), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(232, 243, 253), Font = new Font("Segoe UI Semibold", 11), ForeColor = EstiloVisual.Acento }, 0, 1);
         Controls.Add(regiones); Controls.Add(pie); Controls.Add(cabecera);
     }
 
@@ -25,15 +25,15 @@ internal sealed class EstructuraFat32Form : Form
     private static Panel Tarjeta(string titulo, string subtitulo)
     {
         var p = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(16), Margin = new Padding(3) };
-        p.Controls.Add(new Label { Text = subtitulo, Dock = DockStyle.Top, Height = 30, ForeColor = EstiloVisual.TextoSecundario });
-        p.Controls.Add(new Label { Text = titulo, Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI Semibold", 13), ForeColor = Color.FromArgb(35, 42, 50) });
+        p.Controls.Add(new Label { Text = subtitulo, Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 2, 0, 8), ForeColor = EstiloVisual.TextoSecundario });
+        p.Controls.Add(new Label { Text = titulo, Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 0, 0, 6), Font = new Font("Segoe UI Semibold", 13), ForeColor = Color.FromArgb(35, 42, 50) });
         return p;
     }
     private static TableLayoutPanel Pares(params (string Etiqueta, string Valor)[] filas)
     {
         var t = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Padding = new Padding(0, 8, 0, 0) };
         t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62)); t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
-        foreach (var (etiqueta, valor) in filas) { int r = t.RowCount++; t.RowStyles.Add(new RowStyle(SizeType.Absolute, 27)); t.Controls.Add(new Label { Text = etiqueta, Dock = DockStyle.Fill, ForeColor = EstiloVisual.TextoSecundario }, 0, r); t.Controls.Add(new Label { Text = valor, Dock = DockStyle.Fill, Font = new Font("Segoe UI Semibold", 9) }, 1, r); }
+        foreach (var (etiqueta, valor) in filas) { int r = t.RowCount++; t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.Controls.Add(new Label { Text = etiqueta, AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(0, 3, 0, 3), ForeColor = EstiloVisual.TextoSecundario }, 0, r); t.Controls.Add(new Label { Text = valor, AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(0, 3, 0, 3), Font = new Font("Segoe UI Semibold", 9) }, 1, r); }
         return t;
     }
     private static Panel CrearBoot(DiscoVirtual d)
