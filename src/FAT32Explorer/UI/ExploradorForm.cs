@@ -217,7 +217,7 @@ public sealed class ExploradorForm : Form
 
     private void ConfigurarSistema()
     {
-        using var form = new ConfiguracionSistemaForm(disco.SistemaOperativo);
+        using var form = new ConfiguracionSistemaForm(disco.SistemaOperativo, disco.Configuracion);
         if (form.ShowDialog(this) != DialogResult.OK) return;
         if (form.Nombre.Length == 0 || form.Usuario.Length == 0) { MessageBox.Show(this, "Nombre del SO y usuario son obligatorios."); return; }
         disco.SistemaOperativo.Nombre = form.Nombre; disco.SistemaOperativo.Usuario = form.Usuario;

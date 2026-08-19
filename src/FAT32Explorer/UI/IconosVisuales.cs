@@ -21,8 +21,7 @@ internal static class IconosVisuales
         using var borde = new Pen(Color.FromArgb(190, 132, 22), 1.2f);
         using var relleno = new SolidBrush(Amarillo);
         var forma = new GraphicsPath();
-        forma.AddPolygon([new Point(2, 5), new Point(8, 5), new Point(10, 7), new Point(18, 7), new Point(18, 16), new Point(2, 16)]);
-        g.FillPath(relleno, forma); g.DrawPath(borde, forma);
+        forma.AddPolygon(new Point[] { new Point(2, 5), new Point(8, 5), new Point(10, 7), new Point(18, 7), new Point(18, 16), new Point(2, 16) });
     });
 
     public static Bitmap Texto() => Dibujar(g =>

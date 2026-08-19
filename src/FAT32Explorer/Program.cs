@@ -19,6 +19,6 @@ internal static class Program
             MessageBox.Show($"{ex.Message}\n\nSe creará un disco virtual nuevo. El archivo anterior no será sobrescrito hasta que guarde o cierre la aplicación.", "Disco incompatible", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             disco = DiscoVirtual.CrearPredeterminado();
         }
-        Application.Run(new ExploradorForm(disco, almacenamiento));
+        Application.Run(new MenuPrincipalForm(disco, almacenamiento));
     }
 }

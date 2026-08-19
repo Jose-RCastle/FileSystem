@@ -4,6 +4,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FAT32Explorer", "src\FAT32Explorer\FAT32Explorer.csproj", "{31B0296A-01C7-4DB7-848E-712492903BD8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FAT32Explorer.Nucleo", "src\FAT32Explorer.Nucleo\FAT32Explorer.Nucleo.csproj", "{90C45FFD-90C1-4871-B321-4C95E1A9BF09}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FAT32Explorer.Pruebas", "tests\FAT32Explorer.Pruebas\FAT32Explorer.Pruebas.csproj", "{E46E1EEB-418D-4C70-8D01-43EA281642F3}"
 EndProject
 Global
@@ -16,6 +18,10 @@ Global
 		{31B0296A-01C7-4DB7-848E-712492903BD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{31B0296A-01C7-4DB7-848E-712492903BD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{31B0296A-01C7-4DB7-848E-712492903BD8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{90C45FFD-90C1-4871-B321-4C95E1A9BF09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{90C45FFD-90C1-4871-B321-4C95E1A9BF09}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{90C45FFD-90C1-4871-B321-4C95E1A9BF09}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{90C45FFD-90C1-4871-B321-4C95E1A9BF09}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E46E1EEB-418D-4C70-8D01-43EA281642F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E46E1EEB-418D-4C70-8D01-43EA281642F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E46E1EEB-418D-4C70-8D01-43EA281642F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
