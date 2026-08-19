@@ -84,14 +84,45 @@ internal sealed class ConfiguracionSistemaForm : Form
 {
     private readonly TextBox nombre = new(); private readonly TextBox usuario = new();
     public string Nombre => nombre.Text.Trim(); public string Usuario => usuario.Text.Trim();
-    public ConfiguracionSistemaForm(ConfiguracionSistema actual)
+
+    /// <param name="configuracionDisco">
+    /// Geometría del disco local virtual. El sistema operativo no define estos valores
+    /// (eso ocurre en Configuración → Disco Local); aquí solo los consulta para mostrar
+    /// las capacidades físicas y la política de distribución lógica que administra.
+    /// </param>
+    public ConfiguracionSistemaForm(ConfiguracionSistema actual, ConfiguracionDisco configuracionDisco)
     {
-        Text = "Sistema operativo simulado"; Size = new Size(490, 350); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog; EstiloVisual.Aplicar(this);
+        Text = "Sistema operativo simulado"; Size = new Size(540, 680); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog; EstiloVisual.Aplicar(this);
         nombre.Text = actual.Nombre; usuario.Text = actual.Usuario;
-        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), ColumnCount = 2, RowCount = 7 };
-        tabla.Controls.Add(new Label { Text = "Nombre del SO", AutoSize = true }, 0, 0); tabla.Controls.Add(nombre, 1, 0); tabla.Controls.Add(new Label { Text = "Usuario", AutoSize = true }, 0, 1); tabla.Controls.Add(usuario, 1, 1);
+        var tabla = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), ColumnCount = 2, AutoScroll = true };
+        void Agregar(string texto, Control control) { int fila = tabla.Controls.Count / 2; tabla.Controls.Add(new Label { Text = texto, AutoSize = true, Anchor = AnchorStyles.Left }, 0, fila); control.Dock = DockStyle.Fill; tabla.Controls.Add(control, 1, fila); }
+        void Encabezado(string texto) { int fila = tabla.Controls.Count / 2; var l = new Label { Text = texto, AutoSize = true, Padding = new Padding(0, fila == 0 ? 0 : 10, 0, 2), Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) }; tabla.Controls.Add(l, 0, fila); tabla.SetColumnSpan(l, 2); tabla.Controls.Add(new Label(), 1, fila); }
+        void Info(string etiqueta, string valor) => Agregar(etiqueta, new Label { Text = valor, AutoSize = true, ForeColor = EstiloVisual.TextoSecundario });
+
+        Encabezado("IDENTIDAD DEL SISTEMA");
+        Agregar("Nombre del SO", nombre); Agregar("Usuario", usuario);
+
+        Encabezado("CAPACIDADES FÍSICAS");
+        Info("Capacidad total del volumen", Formato(configuracionDisco.CapacidadBytes));
+        Info("Tamaño de cluster", Formato(configuracionDisco.TamanoClusterBytes));
+        Info("Clusters de datos disponibles", configuracionDisco.CantidadClusters.ToString("N0"));
+        Info("Bytes por sector", configuracionDisco.BytesPorSector.ToString("N0"));
+
+        Encabezado("DISTRIBUCIÓN LÓGICA DE ARCHIVOS");
+        Info("Algoritmo de asignación", configuracionDisco.AlgoritmoAsignacion);
+        Info("Cluster raíz (C:\\)", configuracionDisco.ClusterRaiz.ToString());
+        Info("Copias de la FAT", configuracionDisco.NumeroDeFat.ToString());
+
+        var nota = new Label { Text = "Estos valores físicos se definen en Configuración → Disco Local.\nAquí el sistema operativo virtual los consulta para administrar\ncómo se distribuyen lógicamente los archivos sobre el volumen.", AutoSize = true, ForeColor = Color.DimGray, Font = new Font(SystemFonts.DefaultFont.FontFamily, 8F, FontStyle.Italic), Padding = new Padding(0, 8, 0, 4) };
+        { int fila = tabla.Controls.Count / 2; tabla.Controls.Add(nota, 0, fila); tabla.SetColumnSpan(nota, 2); tabla.Controls.Add(new Label(), 1, fila); }
+
         string[] info = ["Sistema de archivos: FAT32", "Modo: Simulación", "Unidad raíz: C:\\", "Archivos soportados: TXT"];
-        for (int i = 0; i < info.Length; i++) { var l = new Label { Text = info[i], AutoSize = true, ForeColor = Color.DimGray }; tabla.Controls.Add(l, 0, i + 2); tabla.SetColumnSpan(l, 2); }
-        var botones = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Dock = DockStyle.Fill }; botones.Controls.Add(EstiloVisual.Boton("Cancelar", DialogResult.Cancel)); botones.Controls.Add(EstiloVisual.Boton("Guardar", DialogResult.OK)); tabla.Controls.Add(botones, 0, 6); tabla.SetColumnSpan(botones, 2); Controls.Add(tabla);
+        foreach (var linea in info) { int fila = tabla.Controls.Count / 2; var l = new Label { Text = linea, AutoSize = true, ForeColor = Color.DimGray }; tabla.Controls.Add(l, 0, fila); tabla.SetColumnSpan(l, 2); tabla.Controls.Add(new Label(), 1, fila); }
+
+        var botones = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Dock = DockStyle.Fill }; botones.Controls.Add(EstiloVisual.Boton("Cancelar", DialogResult.Cancel)); botones.Controls.Add(EstiloVisual.Boton("Guardar", DialogResult.OK));
+        { int fila = tabla.Controls.Count / 2; tabla.Controls.Add(botones, 0, fila); tabla.SetColumnSpan(botones, 2); }
+        Controls.Add(tabla);
     }
+
+    private static string Formato(long bytes) => bytes < 1024 ? $"{bytes} B" : bytes < 1048576 ? $"{bytes / 1024d:0.##} KiB" : $"{bytes / 1048576d:0.##} MiB";
 }

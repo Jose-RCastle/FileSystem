@@ -8,4 +8,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RootNamespace>FAT32Explorer</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../FAT32Explorer.Nucleo/FAT32Explorer.Nucleo.csproj" />
+  </ItemGroup>
 </Project>
